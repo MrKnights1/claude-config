@@ -1,121 +1,208 @@
-# CLAUDE.md Configuration Repository
+# CLAUDE.md Configuration
 
-This directory contains a production-ready CLAUDE.md configuration following official Claude Code best practices.
+Standard CLAUDE.md configuration for Claude Code projects with modular guidelines following official Anthropic best practices.
 
-## What's Here
+## ⚡ Quick Install
 
-```
-prompts&modes/
-├── CLAUDE.md                              # Main config (200 lines)
-├── .claude/                               # Modular guidelines
-│   ├── security.md                        # Security best practices
-│   ├── testing.md                         # Testing requirements
-│   ├── api-design.md                      # API & logging standards
-│   ├── structure.md                       # Project structure
-│   ├── database.md                        # Database & migrations
-│   └── standards.md                       # Code quality & cleanup
-├── install.sh                             # GitHub-based installer
-├── GITHUB_SETUP_GUIDE.md                  # Full setup instructions
-├── CLAUDE_MD_BEST_PRACTICES_OFFICIAL.md   # Best practices reference
-└── CLAUDE_MD_IMPROVEMENTS.md              # Original improvement analysis
-```
-
-## Quick Start: 3 Options
-
-### Option 1: Use in Current Project (Simplest)
-
-Just copy the files to any project:
+### Option 1: Official GitHub URL (Recommended)
 
 ```bash
-# From any project directory
-cp /root/projektid/prompts\&modes/CLAUDE.md .
-cp -r /root/projektid/prompts\&modes/.claude .
+curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh | bash
 ```
 
-### Option 2: Create GitHub Repository (Recommended)
-
-Set up a public GitHub repo so you can install with one command in all your projects:
-
-1. **Follow the guide:** Read `GITHUB_SETUP_GUIDE.md`
-2. **Create repo:** `gh repo create claude-config --public`
-3. **Upload files:** Push CLAUDE.md and .claude/ to the repo
-4. **Create install.sh:** Add the installer script
-5. **Done!** Now install anywhere with:
+### Option 2: Shortened URL (Convenient)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/claude-config/main/install.sh | bash
+curl -fsSL http://bit.ly/47KeOMh | bash
 ```
 
-### Option 3: Shorten the URL
-
-After setting up GitHub repo:
-
-1. Go to https://bit.ly
-2. Shorten your install.sh URL
-3. Get something like: `https://bit.ly/my-claude`
-
-Now install with:
+### Option 3: With wget
 
 ```bash
-curl -fsSL https://bit.ly/my-claude | bash
+wget -qO- https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh | bash
 ```
 
-## What Makes This Special
+### Option 4: Manual Clone
+
+```bash
+git clone https://github.com/MrKnights1/claude-config.git
+cp claude-config/CLAUDE.md .
+cp -r claude-config/.claude .
+rm -rf claude-config
+```
+
+---
+
+## 📦 What's Included
+
+```
+claude-config/
+├── CLAUDE.md                  # Main config (200 lines, optimized)
+└── .claude/                   # Modular guidelines
+    ├── security.md           # Security best practices
+    ├── testing.md            # Testing requirements
+    ├── api-design.md         # API & logging standards
+    ├── structure.md          # Project structure conventions
+    ├── database.md           # Database & migration guidelines
+    └── standards.md          # Code quality & cleanup rules
+```
+
+## ✨ Features
 
 ✅ **Follows Official Best Practices**
-- Main file: exactly 200 lines (recommended 100-200)
-- Modular design with imports
+- Main file: 200 lines (recommended 100-200)
+- Modular design with `@.claude/*.md` imports
 - Concise and scannable
 
 ✅ **Comprehensive Coverage**
 - Git workflow with GitHub issues
 - Security guidelines (XSS, SQL injection, auth)
-- Testing requirements
-- API design standards
-- Database migration best practices
+- Testing requirements & best practices
+- RESTful API design standards
+- Database migration procedures
 - Code quality & cleanup rules
 
 ✅ **Production-Ready**
-- Used and tested
-- Easy to customize
-- Team-friendly
+- Used and tested in real projects
+- Easy to customize for your stack
+- Team-friendly documentation
 
-## Customization
+---
 
-After installing in a project:
+## 🚀 Usage
 
-1. **Update Common Commands** in `CLAUDE.md`:
-   ```bash
-   # Replace example commands with your actual commands
-   npm run dev       # or: bun dev, yarn dev, etc.
-   npm run build
-   npm test
-   ```
+### Install in New Project
 
-2. **Adjust guidelines** in `.claude/` files for your tech stack
+```bash
+mkdir my-new-project
+cd my-new-project
 
-3. **Commit to git** so your team benefits
+# Install CLAUDE.md configuration
+curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh | bash
 
-## How It Works
+# Initialize git
+git init
+git add CLAUDE.md .claude/
+git commit -m "Add CLAUDE.md configuration"
 
-The `@.claude/security.md` syntax in CLAUDE.md automatically imports those files into Claude's context. When Claude Code starts, it loads:
+# Start using Claude Code!
+```
 
-- Your main CLAUDE.md (200 lines of essential rules)
-- All imported files from .claude/ directory (detailed guidelines)
+### Add to Existing Project
+
+```bash
+cd existing-project
+
+# Install configuration
+curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh | bash
+
+# Customize for your project
+vim CLAUDE.md  # Update "Common Commands" section
+
+# Commit
+git add CLAUDE.md .claude/
+git commit -m "Add CLAUDE.md for Claude Code"
+```
+
+---
+
+## 🎯 Customization
+
+After installation, customize for your project:
+
+### 1. Update Common Commands (Required)
+
+Edit `CLAUDE.md` and replace the example commands:
+
+```bash
+### Common Commands (Update for your project)
+```bash
+# YOUR actual commands here:
+npm run dev       # Start development server
+npm run build     # Build for production
+npm test          # Run tests
+npm run lint      # Run linter
+```
+
+### 2. Adjust Guidelines (Optional)
+
+Review and modify files in `.claude/` directory:
+- `security.md` - Add your specific security requirements
+- `testing.md` - Add your testing framework specifics
+- `api-design.md` - Adjust API conventions
+- `structure.md` - Match your project structure
+- `database.md` - Add your ORM specifics
+- `standards.md` - Add team-specific standards
+
+### 3. Commit to Repository
+
+```bash
+git add CLAUDE.md .claude/
+git commit -m "Customize CLAUDE.md for project"
+```
+
+---
+
+## 📖 How It Works
+
+The `@.claude/security.md` syntax in CLAUDE.md automatically imports those files into Claude's context.
+
+When Claude Code starts, it loads:
+1. Your main `CLAUDE.md` (200 lines of essential rules)
+2. All imported files from `.claude/` directory
 
 This gives Claude complete context while keeping the main file scannable.
 
-## Best Practices Reference
+---
 
-See `CLAUDE_MD_BEST_PRACTICES_OFFICIAL.md` for:
-- Official recommendations from Anthropic
-- Length guidelines (100-200 lines)
-- When to use imports
-- The `#` key feature
-- Common mistakes to avoid
-- Testing effectiveness
+## 📚 Documentation
 
-## File Sizes
+- **Installation**: This README
+- **Best Practices**: See `CLAUDE_MD_BEST_PRACTICES_OFFICIAL.md` (included in this repo)
+- **Setup Guide**: See `GITHUB_SETUP_GUIDE.md` (included in this repo)
+
+---
+
+## 🔧 Installation Links Summary
+
+| Method | Command |
+|--------|---------|
+| **GitHub URL (curl)** | `curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh \| bash` |
+| **GitHub URL (wget)** | `wget -qO- https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh \| bash` |
+| **Shortened (curl)** | `curl -fsSL http://bit.ly/47KeOMh \| bash` |
+| **Shortened (wget)** | `wget -qO- http://bit.ly/47KeOMh \| bash` |
+| **Git Clone** | `git clone https://github.com/MrKnights1/claude-config.git` |
+
+---
+
+## 💡 Tips
+
+1. **Use the `#` key** in Claude Code to quickly update CLAUDE.md during development
+2. **Commit CLAUDE.md changes** with your feature commits so the team benefits
+3. **Share with your team** - Use official GitHub URL or shortened link (`http://bit.ly/47KeOMh`)
+4. **Customize per project** but keep core security/quality rules consistent
+5. **Review periodically** - remove guidelines that don't improve Claude's output
+
+---
+
+## 🔄 Updating Your Configuration
+
+To update CLAUDE.md in existing projects:
+
+```bash
+# Backup your customizations
+cp CLAUDE.md CLAUDE.md.backup
+
+# Reinstall latest version
+curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh | bash
+
+# Merge your customizations back
+# (especially the "Common Commands" section)
+```
+
+---
+
+## 📊 File Sizes
 
 ```
 CLAUDE.md               5.9K  (200 lines)
@@ -125,146 +212,36 @@ CLAUDE.md               5.9K  (200 lines)
 .claude/structure.md    3.3K  (project structure)
 .claude/database.md     2.5K  (database best practices)
 .claude/standards.md    2.5K  (code quality)
------------------------------------
-Total:                 ~22K  (well within recommended limits)
+-------------------------------------------
+Total:                 ~22K  (well optimized)
 ```
 
-## Examples
+---
 
-### Install in New Project
+## 🤝 Contributing
 
-```bash
-mkdir my-new-project
-cd my-new-project
+This is a personal configuration, but feel free to:
+- Fork for your own use
+- Suggest improvements via issues
+- Create your own variants
 
-# Copy from this template
-cp /root/projektid/prompts\&modes/CLAUDE.md .
-cp -r /root/projektid/prompts\&modes/.claude .
+---
 
-# Initialize git
-git init
-git add CLAUDE.md .claude/
-git commit -m "Add CLAUDE.md configuration"
-
-# Start coding with Claude!
-claude
-```
-
-### Update Existing Project
-
-```bash
-cd existing-project
-
-# Copy files
-cp /root/projektid/prompts\&modes/CLAUDE.md .
-cp -r /root/projektid/prompts\&modes/.claude .
-
-# Review and customize
-vim CLAUDE.md
-
-# Commit
-git add CLAUDE.md .claude/
-git commit -m "Add CLAUDE.md configuration for Claude Code"
-```
-
-## GitHub Repository Setup
-
-**Full instructions:** See `GITHUB_SETUP_GUIDE.md`
-
-**Quick version:**
-
-```bash
-# 1. Create repository
-gh repo create claude-config --public
-
-# 2. Push these files
-cd /root/projektid/prompts\&modes
-git init
-git add CLAUDE.md .claude/ install.sh SETUP_README.md GITHUB_SETUP_GUIDE.md
-git commit -m "Initial CLAUDE.md configuration"
-git remote add origin https://github.com/YOUR_USERNAME/claude-config.git
-git push -u origin main
-
-# 3. Update install.sh with your GitHub username
-
-# 4. Test it works
-cd /tmp/test
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/claude-config/main/install.sh | bash
-```
-
-## URL Shortening Services
-
-Create memorable install commands:
-
-| Service | URL | Registration |
-|---------|-----|--------------|
-| [bit.ly](https://bit.ly) | `https://bit.ly/your-name` | Required (free) |
-| [is.gd](https://is.gd) | `https://is.gd/your-name` | None needed |
-| [TinyURL](https://tinyurl.com) | `https://tinyurl.com/your-name` | Optional |
-| [git.io](https://git.io) | `https://git.io/your-name` | GitHub only |
-
-**Example:**
-
-Original:
-```bash
-curl -fsSL https://raw.githubusercontent.com/yourusername/claude-config/main/install.sh | bash
-```
-
-Shortened:
-```bash
-curl -fsSL https://bit.ly/my-claude | bash
-```
-
-## Maintenance
-
-### Updating the Configuration
-
-```bash
-# Edit files
-vim CLAUDE.md
-vim .claude/security.md
-
-# Commit to your GitHub repo
-git add .
-git commit -m "Update security guidelines"
-git push
-
-# Now all future installations get the update automatically!
-```
-
-### Versioning
-
-Create branches for different configurations:
-
-```bash
-git checkout -b react      # React-specific config
-git checkout -b nodejs     # Node.js-specific config
-git checkout -b python     # Python-specific config
-```
-
-Install specific version:
-```bash
-curl -fsSL https://raw.githubusercontent.com/YOU/claude-config/react/install.sh | bash
-```
-
-## Tips
-
-1. **Use the `#` key** in Claude Code to quickly update CLAUDE.md
-2. **Commit CLAUDE.md changes** with your feature commits
-3. **Share with your team** via shortened URL
-4. **Customize per project** but keep core rules consistent
-5. **Review periodically** - remove what doesn't improve Claude's output
-
-## Questions?
-
-- **Best practices:** See `CLAUDE_MD_BEST_PRACTICES_OFFICIAL.md`
-- **Setup help:** See `GITHUB_SETUP_GUIDE.md`
-- **Improvements:** See `CLAUDE_MD_IMPROVEMENTS.md`
-
-## License
+## 📝 License
 
 Free to use in all your projects. No attribution needed.
 
 ---
 
+## 🔗 Links
+
+- **Repository**: https://github.com/MrKnights1/claude-config
+- **Official Install**: `curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh | bash`
+- **Shortened Install** (alternative): http://bit.ly/47KeOMh
+- **Claude Code Docs**: https://docs.claude.com/en/docs/claude-code
+
+---
+
 **Made for Claude Code following official Anthropic best practices.**
+
+Last updated: 2025-10-30
