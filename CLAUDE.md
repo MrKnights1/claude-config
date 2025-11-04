@@ -177,6 +177,7 @@ For comprehensive guidelines on specific topics, see:
 - Use environment variables for secrets
 - Validate user input
 - Use parameterized queries (prevent SQL injection)
+- Design code to be modular when possible (separate concerns, reusable components)
 
 ### Never
 - Commit directly to main
