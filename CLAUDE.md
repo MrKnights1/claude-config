@@ -18,6 +18,8 @@ When asked to change project source code or database dump:
      - Commit with proper message (see Commit Guidelines): `git commit`
      - Push to remote: `git push origin main`
 
+**Note:** If code changes are completed first and issue is created afterwards, skip branch creation. Simply create issue with `gh issue create`, commit directly to main with `Closes #XX` in commit message.
+
 ### Issue Creation
 
 ```bash
