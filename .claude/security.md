@@ -7,35 +7,26 @@ This document provides actionable security requirements following OWASP ASVS. Wh
 ## Quick Reference - Critical Security Rules
 
 ### ALWAYS
-- Use parameterized queries (NEVER concatenate SQL)
+- Use parameterized queries for all database operations
 - Validate AND sanitize all user input
 - Use context-appropriate output encoding (HTML, JavaScript, URL)
 - Hash passwords with bcrypt/scrypt/Argon2 (minimum 10 rounds)
-- Use cryptographically secure random generation for security tokens
+- Use cryptographically secure random generation for security tokens (crypto.randomBytes, random_bytes)
 - Implement CSRF protection on state-changing requests
 - Set secure session cookie flags (httpOnly, secure, sameSite)
 - Enforce HTTPS in production
 - Return generic error messages to users
 - Log security events with proper metadata
 - Validate file uploads by content (MIME), not extension
-- Use environment variables for secrets
+- Store secrets in environment variables
 - Implement rate limiting on authentication endpoints
 - Require MFA for sensitive applications
 - Re-authenticate before sensitive account changes
-
-### NEVER
-- Store secrets in plain text or hardcode them
-- Use weak cryptography (MD5, SHA-1, ECB mode)
-- Use non-cryptographic random (Math.random, rand)
-- Use eval() or dynamic code execution with user input
-- Expose stack traces, internal paths, or DB details to users
-- Log passwords, tokens, credit cards, or PII
-- Trust client-side validation or authorization
-- Use password hints or security questions
-- Use email or SMS as primary authentication
-- Send sensitive data in URLs or to third-party analytics
-- Use CORS wildcard (*) in production
-- Implement custom cryptographic algorithms
+- Use industry-validated cryptographic libraries (OpenSSL, libsodium, crypto module)
+- Use strong cryptography (AES-GCM, SHA-256+, TLS 1.2+)
+- Verify authorization server-side for all protected resources
+- Use explicit origin lists for CORS configuration
+- Sanitize user input before logging to prevent log injection
 
 ---
 
