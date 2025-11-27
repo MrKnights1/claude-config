@@ -52,6 +52,7 @@ Actual: [What happens]
 ### Implementation
 
 - Branch: `XX-short-description` (XX = issue number)
+- Search the project for existing examples and patterns before writing code (templates, pages, components, functions)
 - Make commits on branch with simple, descriptive messages
 - Squash merge to main when complete with proper commit message
 
@@ -174,6 +175,7 @@ For comprehensive guidelines on specific topics, see:
 
 ### Always
 - Create GitHub issues for features and bugs
+- Search the project for existing examples and patterns before writing code (templates, pages, components, functions)
 - Write tests for new features
 - Remove console.log and commented code before committing
 - Use environment variables for secrets
