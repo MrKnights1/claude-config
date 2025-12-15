@@ -182,6 +182,7 @@ For comprehensive guidelines on specific topics, see:
 - Validate user input
 - Use parameterized queries (prevent SQL injection)
 - Design code to be modular when possible (separate concerns, reusable components)
+- Use relative paths for imports and file references within the project
 
 ### Never
 - Commit directly to main
