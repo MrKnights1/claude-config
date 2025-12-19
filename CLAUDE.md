@@ -191,6 +191,7 @@ For comprehensive guidelines on specific topics, see:
 - Modify database directly in production
 - Expose error details to users
 - Trust client-side validation alone
+- Add unnecessary fallbacks or error handling for scenarios that cannot occur
 
 ### Protected Areas
 
