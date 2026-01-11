@@ -179,6 +179,9 @@ For comprehensive guidelines on specific topics, see:
 ### Security
 @.claude/security.md
 
+### Security Review Process
+@.claude/security-review.md
+
 ### Testing
 @.claude/testing.md
 
