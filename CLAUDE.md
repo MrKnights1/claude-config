@@ -184,6 +184,7 @@ For comprehensive guidelines on specific topics, see:
 - Design code to be modular when possible (separate concerns, reusable components)
 - Use absolute paths for imports and file references within the project
 - Write all code elements in English (comments, placeholders, variable names, function names, commit messages, documentation, error messages, TODOs)
+- Create a todo list when entering plan mode to track tasks and progress
 
 ### Never
 - Commit directly to main
