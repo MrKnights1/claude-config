@@ -1,5 +1,16 @@
 # CLAUDE.md
 
+## Project Overview
+
+<!-- Fill in for your project -->
+Brief description of what this project does.
+
+- **Tech stack:** [e.g., Next.js, PostgreSQL, TypeScript]
+- **Architecture:** [e.g., Monolith, API + SPA, Microservices]
+- **Primary language:** [e.g., TypeScript, Python, Go]
+
+---
+
 ## Development Workflow
 
 ### Claude Workflow
@@ -115,7 +126,21 @@ Always verify functionality before claiming it works:
 - Check actual outputs and behavior
 - If verification fails, report the actual error - don't claim it works
 
-Example: Don't say "Docker is running on port 3000" unless you ran `docker compose up` and verified it started without errors
+Example: Don't say "Docker is running on port 3000" unless you ran `docker compose ps` or `docker ps` and verified the container is actually running
+
+---
+
+## Pre-Commit Checklist
+
+Before committing, verify:
+
+- [ ] Tests pass locally
+- [ ] No linting/type errors
+- [ ] No `console.log` statements left in code
+- [ ] No commented-out code
+- [ ] Environment variables documented in `.env.example`
+- [ ] Database migrations tested (if applicable)
+- [ ] API changes documented (if applicable)
 
 ---
 
@@ -171,9 +196,34 @@ For comprehensive guidelines on specific topics, see:
 
 ---
 
+## Error Handling Patterns
+
+### API/Backend Errors
+
+- Return consistent error format: `{ success: false, error: { message, code } }`
+- Log errors server-side with request ID and context
+- Never expose stack traces or internal details to clients
+- Use appropriate HTTP status codes (400 for client errors, 500 for server errors)
+
+### Frontend/UI Errors
+
+- Use error boundaries to catch and display component errors gracefully
+- Show user-friendly error messages (not technical details)
+- Provide clear recovery actions (retry button, go back, contact support)
+- Log errors to monitoring service for debugging
+
+### Error Message Guidelines
+
+- Be specific but not technical: "Could not save your changes" not "Database write failed"
+- Suggest next steps when possible: "Please try again" or "Contact support if this continues"
+- Avoid blame: "Something went wrong" not "You entered invalid data"
+
+---
+
 ## Critical Rules Summary
 
 ### Always
+- Check if Project Overview and Environment Notes sections in CLAUDE.md contain placeholder text (e.g., `[e.g.,`). If so, offer to run `/init` to auto-fill these sections by analyzing package.json, docker-compose.yml, .env.example, and project structure
 - Create GitHub issues for features and bugs
 - Search the project for existing examples and patterns before writing code (templates, pages, components, functions)
 - Write tests for new features
@@ -207,3 +257,24 @@ ALWAYS ask before:
 - Modifying database schemas
 - Adding new dependencies
 - Changing API contracts
+
+---
+
+## Environment Notes
+
+<!-- Fill in for your project -->
+
+### Development
+- **Database:** [e.g., Local PostgreSQL on port 5432]
+- **API URL:** [e.g., http://localhost:3000]
+- **Auth:** [e.g., Mock auth / Local Keycloak]
+
+### Staging
+- **URL:** [e.g., staging.example.com]
+- **Data:** [e.g., Anonymized production data / Seed data]
+
+### Production
+- **URL:** [e.g., app.example.com]
+- NEVER run destructive commands
+- All schema changes require migration review
+- All changes require PR approval
