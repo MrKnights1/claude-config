@@ -8,8 +8,13 @@
 - Add comments only when code intent isn't obvious from names alone
 - Maximum function length: ~50 lines (break up larger functions)
 - Maximum file length: ~300-400 lines (split into modules)
-
----
+- Maximum nesting depth: 2-3 levels (use early returns)
+- Maximum function parameters: 3-4 (use objects for more)
+- Use named constants instead of magic numbers/strings
+- Extract complex conditions into named variables or functions
+- Separate concerns: data access, business logic, presentation
+- Pass dependencies explicitly instead of using global state
+- Keep pure functions free of side effects
 
 ## Pull Request Guidelines
 
