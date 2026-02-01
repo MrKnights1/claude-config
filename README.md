@@ -37,14 +37,19 @@ rm -rf claude-config
 
 ```
 claude-config/
-├── CLAUDE.md                  # Main config (200 lines, optimized)
+├── CLAUDE.md                  # Main config (optimized)
 └── .claude/                   # Modular guidelines
     ├── security.md           # Security best practices
+    ├── security-review.md    # Security review process
     ├── testing.md            # Testing requirements
     ├── api-design.md         # API & logging standards
     ├── structure.md          # Project structure conventions
     ├── database.md           # Database & migration guidelines
-    └── standards.md          # Code quality & cleanup rules
+    ├── standards.md          # Code quality & cleanup rules
+    └── skills/               # Invocable skills
+        ├── commit/SKILL.md   # /commit - create git commits
+        ├── merge/SKILL.md    # /merge - squash merge to main
+        └── issue/SKILL.md    # /issue - create GitHub issues
 ```
 
 ## ✨ Features
@@ -61,6 +66,11 @@ claude-config/
 - RESTful API design standards
 - Database migration procedures
 - Code quality & cleanup rules
+
+✅ **Invocable Skills**
+- `/commit` - Create git commits with proper format
+- `/merge` - Squash merge feature branches to main
+- `/issue` - Create GitHub issues (features & bugs)
 
 ✅ **Production-Ready**
 - Used and tested in real projects
@@ -202,19 +212,17 @@ curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/insta
 
 ---
 
-## 📊 File Sizes
+## 🎮 Using Skills
+
+Skills are invoked with slash commands in Claude Code:
 
 ```
-CLAUDE.md               5.9K  (200 lines)
-.claude/security.md     3.1K  (security guidelines)
-.claude/testing.md      1.6K  (testing requirements)
-.claude/api-design.md   2.9K  (API & logging)
-.claude/structure.md    3.3K  (project structure)
-.claude/database.md     2.5K  (database best practices)
-.claude/standards.md    2.5K  (code quality)
--------------------------------------------
-Total:                 ~22K  (well optimized)
+/commit          # Create a git commit
+/merge           # Squash merge to main
+/issue           # Create a GitHub issue
 ```
+
+Skills provide structured workflows that Claude follows automatically.
 
 ---
 
@@ -243,5 +251,3 @@ Free to use in all your projects. No attribution needed.
 ---
 
 **Made for Claude Code following official Anthropic best practices.**
-
-Last updated: 2025-10-30
