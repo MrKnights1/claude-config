@@ -20,9 +20,12 @@ NC='\033[0m'
 echo -e "${BLUE}🤖 CLAUDE.md Quick Installer${NC}"
 echo -e "${BLUE}================================${NC}\n"
 
-# Create .claude directory
-echo -e "${YELLOW}Creating .claude directory...${NC}"
+# Create directories
+echo -e "${YELLOW}Creating directories...${NC}"
 mkdir -p .claude
+mkdir -p .claude/skills/commit
+mkdir -p .claude/skills/merge
+mkdir -p .claude/skills/issue
 
 # Download files
 echo -e "${YELLOW}Downloading CLAUDE.md configuration...${NC}"
@@ -30,11 +33,15 @@ echo -e "${YELLOW}Downloading CLAUDE.md configuration...${NC}"
 files=(
     "CLAUDE.md"
     ".claude/security.md"
+    ".claude/security-review.md"
     ".claude/testing.md"
     ".claude/api-design.md"
     ".claude/structure.md"
     ".claude/database.md"
     ".claude/standards.md"
+    ".claude/skills/commit/SKILL.md"
+    ".claude/skills/merge/SKILL.md"
+    ".claude/skills/issue/SKILL.md"
 )
 
 for file in "${files[@]}"; do
