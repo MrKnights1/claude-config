@@ -101,11 +101,22 @@ project-root/
 - Use plural for collections: `components/`, `utils/`, `hooks/`
 
 ### Files
+
+File names must describe what the file does, not just the subject. Use verb+noun or clear action names.
+
+| Bad | Good | Why |
+|-----|------|-----|
+| `slug.js` | `generateSlug.js` | Describes the action |
+| `email.js` | `sendEmail.js` | Clarifies purpose |
+| `password.js` | `hashPassword.js` | Specific function |
+| `user.js` | `UserService.js` | Indicates service role |
+| `auth.js` | `validateToken.js` | States what it does |
+
 | Type | Convention | Example |
 |------|------------|---------|
 | React components | PascalCase | `UserProfile.tsx` |
 | Vue components | PascalCase | `UserProfile.vue` |
-| Utilities | camelCase | `formatDate.ts` |
+| Utilities | camelCase, verb+noun | `generateSlug.ts`, `formatDate.ts` |
 | Constants | camelCase or UPPER_SNAKE | `config.ts`, `API_ENDPOINTS.ts` |
 | Types | PascalCase | `User.types.ts` |
 | Tests | Match source + suffix | `UserProfile.test.tsx` |
