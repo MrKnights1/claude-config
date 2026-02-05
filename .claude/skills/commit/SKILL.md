@@ -21,6 +21,7 @@ Create a simple, descriptive commit on the current branch.
 - NEVER include "Co-Authored-By: Claude"
 - NEVER include "Closes #XX"
 - Do NOT push (only add and commit)
+- Do NOT ask about creating issues - just commit
 
 ## Examples
 
