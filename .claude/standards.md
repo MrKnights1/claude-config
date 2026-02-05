@@ -15,6 +15,12 @@
 - Separate concerns: data access, business logic, presentation
 - Pass dependencies explicitly instead of using global state
 - Keep pure functions free of side effects
+- Avoid circular dependencies between modules
+- No god classes/functions (if it does too many things, split it)
+- Prefer composition over inheritance
+- Single source of truth for state (don't duplicate data)
+- Avoid callback hell (use async/await, Promises)
+- Don't mix abstraction levels in same function (high-level logic shouldn't contain low-level details)
 
 ## Pull Request Guidelines
 
