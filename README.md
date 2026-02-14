@@ -31,6 +31,21 @@ cp -r claude-config/.claude .
 rm -rf claude-config
 ```
 
+### Global Install (All Projects)
+
+Install globally to `~/.claude/` so guidelines and skills apply to every project:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh | bash -s -- --global
+```
+
+This places files at the correct global paths:
+- `~/.claude/CLAUDE.md` - Main guidelines
+- `~/.claude/.claude/*.md` - Imported guideline files (resolves `@.claude/` imports)
+- `~/.claude/skills/*/` - Skills available in all sessions
+
+> **Project vs Global:** Use project install when you want per-project customization (different commands, stack-specific rules). Use global install for shared defaults across all projects. Project-level files override global ones.
+
 ---
 
 ## 📦 What's Included
@@ -181,6 +196,7 @@ This gives Claude complete context while keeping the main file scannable.
 | **GitHub URL (wget)** | `wget -qO- https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh \| bash` |
 | **Shortened (curl)** | `curl -fsSL http://bit.ly/47KeOMh \| bash` |
 | **Shortened (wget)** | `wget -qO- http://bit.ly/47KeOMh \| bash` |
+| **Global (curl)** | `curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh \| bash -s -- --global` |
 | **Git Clone** | `git clone https://github.com/MrKnights1/claude-config.git` |
 
 ---
