@@ -54,6 +54,7 @@ guideline_files=(
     "structure.md"
     "database.md"
     "standards.md"
+    "project-init.md"
 )
 
 skill_dirs=(

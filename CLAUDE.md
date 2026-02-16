@@ -1,13 +1,7 @@
 # CLAUDE.md
 
-## Project Overview
-
-<!-- Fill in for your project -->
-Brief description of what this project does.
-
-- **Tech stack:** [e.g., Next.js, PostgreSQL, TypeScript]
-- **Architecture:** [e.g., Monolith, API + SPA, Microservices]
-- **Primary language:** [e.g., TypeScript, Python, Go]
+## Project Initialization
+@.claude/project-init.md
 
 ---
 
@@ -53,18 +47,7 @@ Example: Don't say "Docker is running on port 3000" unless you ran `docker compo
 
 ---
 
-## Quick Reference
-
-### Common Commands (Update for your project)
-```bash
-# Build, test, and dev commands go here
-# Example:
-# npm run dev       # Start dev server
-# npm run build     # Build for production
-# npm test          # Run tests
-```
-
-### File Placement Quick Guide
+## File Placement Quick Guide
 
 | File Type | Location |
 |-----------|----------|
@@ -135,7 +118,7 @@ For comprehensive guidelines on specific topics, see:
 ## Critical Rules Summary
 
 ### Always
-- Check if Project Overview and Environment Notes sections in CLAUDE.md contain placeholder text (e.g., `[e.g.,`). If so, offer to fill these sections by analyzing package.json, docker-compose.yml, .env.example, and project structure
+- When asked to init or create a project CLAUDE.md, follow @.claude/project-init.md
 - Create GitHub issues for features and bugs
 - Search the project for existing examples and patterns before writing code (templates, pages, components, functions)
 - Write tests for new features
@@ -170,23 +153,3 @@ ALWAYS ask before:
 - Adding new dependencies
 - Changing API contracts
 
----
-
-## Environment Notes
-
-<!-- Fill in for your project -->
-
-### Development
-- **Database:** [e.g., Local PostgreSQL on port 5432]
-- **API URL:** [e.g., http://localhost:3000]
-- **Auth:** [e.g., Mock auth / Local Keycloak]
-
-### Staging
-- **URL:** [e.g., staging.example.com]
-- **Data:** [e.g., Anonymized production data / Seed data]
-
-### Production
-- **URL:** [e.g., app.example.com]
-- NEVER run destructive commands
-- All schema changes require migration review
-- All changes require PR approval
