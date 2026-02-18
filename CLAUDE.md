@@ -5,33 +5,6 @@
 
 ---
 
-## Development Workflow
-
-### Claude Workflow
-
-When asked to change project source code or database dump:
-
-1. Ask: "Should we create a GitHub issue for this?"
-2. If yes:
-   - Create issue (see `/issue` skill)
-   - Create and checkout linked branch: `gh issue develop <issue-number> --checkout`
-   - Implement and commit changes to branch
-   - Ask: "Is there anything else you want to change, or should I squash merge this to main and close issue #XX?"
-   - If changes needed: make additional commits
-   - If complete:
-     - Squash merge to main: `git checkout main && git merge --squash XX-short-descr`
-     - Commit with proper message (see `/merge` skill)
-     - Let user push manually
-
-**Note:** If code changes are completed first and issue is created afterwards, skip branch creation. Simply create issue with `gh issue create`, commit directly to main with `Closes #XX` in commit message.
-
-### Implementation
-
-- Branch: `XX-short-description` (XX = issue number)
-- Search the project for existing examples and patterns before writing code (templates, pages, components, functions)
-- Make commits on branch with simple, descriptive messages (see `/commit` skill)
-- Squash merge to main when complete with proper commit message
-
 ---
 
 ## Verification Standards
