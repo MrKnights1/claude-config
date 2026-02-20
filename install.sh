@@ -61,6 +61,7 @@ skill_dirs=(
     "commit"
     "merge"
     "issue"
+    "review"
 )
 
 if [ "$INSTALL_MODE" = "global" ]; then

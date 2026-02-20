@@ -1,7 +1,6 @@
 ---
 name: issue
 description: Create a GitHub issue. Use when user says "create issue", "report bug", "new feature request", or "open issue".
-allowed-tools: Bash(gh issue *)
 ---
 
 Create a GitHub issue using the `gh` CLI.

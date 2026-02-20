@@ -1,7 +1,6 @@
 ---
 name: merge
 description: Squash merge feature branch to main. Use when user says "merge to main", "squash merge", or "finish feature".
-allowed-tools: Bash(git log*), Bash(git diff*), Bash(git checkout *), Bash(git merge *), Bash(git commit *)
 ---
 
 Squash merge completed feature branch to main with proper commit message.

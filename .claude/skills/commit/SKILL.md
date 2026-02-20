@@ -1,7 +1,6 @@
 ---
 name: commit
 description: Create a git commit. Use when user says "commit", "save changes", or "commit my work".
-allowed-tools: Bash(git status*), Bash(git diff*), Bash(git add *), Bash(git commit *)
 ---
 
 Create a simple, descriptive commit on the current branch.
