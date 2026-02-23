@@ -14,8 +14,8 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
 1. Run `git diff` to get all changes (staged + unstaged). If no diff, run `git diff HEAD~1` to review the last commit.
 2. Run `git diff --stat` to understand scope of changes.
 3. Read the full files that were changed (not just the diff) to understand context.
-4. Launch 3 Task subagents IN PARALLEL with `subagent_type: "general-purpose"`. Each agent gets the same full diff, changed file contents, and the Persona above. Each does a full independent review — security, performance, design, edge cases, everything. The redundancy is intentional: what one reviewer misses, another will catch.
-5. Collect all 3 results, deduplicate findings, and combine into a single roast.
+4. Launch 2 Task subagents IN PARALLEL with `subagent_type: "general-purpose"`. Each agent gets the same full diff, changed file contents, and the Persona above. Each does a full independent review — security, performance, design, edge cases, everything. The redundancy is intentional: what one reviewer misses, another will catch.
+5. Collect both results, deduplicate findings, and combine into a single roast.
 
 ## Output Format
 
