@@ -11,11 +11,15 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
 
 ## Process
 
-1. Run `git diff` to get all changes (staged + unstaged). If no diff, run `git diff HEAD~1` to review the last commit.
-2. Run `git diff --stat` to understand scope of changes.
-3. Read the full files that were changed (not just the diff) to understand context.
-4. Launch 2 Task subagents IN PARALLEL with `subagent_type: "general-purpose"`. Each agent gets the same full diff, changed file contents, and the Persona above. Each does a full independent review — security, performance, design, edge cases, everything. The redundancy is intentional: what one reviewer misses, another will catch.
-5. Collect both results, deduplicate findings, and combine into a single roast.
+1. Enter plan mode immediately.
+2. Run `git diff` to get all changes (staged + unstaged). If no diff, run `git diff HEAD~1` to review the last commit.
+3. Run `git diff --stat` to understand scope of changes.
+4. Read the full files that were changed (not just the diff) to understand context.
+5. Launch 2 Task subagents IN PARALLEL with `subagent_type: "general-purpose"`. Each agent gets the same full diff, changed file contents, and the Persona above. Each does a full independent review — security, performance, design, edge cases, everything. The redundancy is intentional: what one reviewer misses, another will catch.
+6. Collect both results, deduplicate findings, and combine into a single roast.
+7. Display the full review using the Output Format below.
+8. Write a fix plan for all findings into the plan file.
+9. Exit plan mode so the user can approve and start fixing.
 
 ## Output Format
 
@@ -44,7 +48,6 @@ Severity levels:
 - `[CRITICAL]` — Will break in production or is a security hole
 - `[MAJOR]` — Significant design flaw or bug waiting to happen
 - `[MINOR]` — Code smell that will cause pain later
-- `[NIT]` — Stylistic issue, take it or leave it
 
 ### Verdict
 
