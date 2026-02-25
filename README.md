@@ -187,7 +187,6 @@ This gives Claude complete context while keeping the main file scannable.
 
 - **Installation**: This README
 - **Best Practices**: See `CLAUDE_MD_BEST_PRACTICES_OFFICIAL.md` (included in this repo)
-- **Setup Guide**: See `GITHUB_SETUP_GUIDE.md` (included in this repo)
 
 ---
 
