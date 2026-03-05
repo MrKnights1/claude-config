@@ -13,7 +13,7 @@ curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/insta
 ### Option 2: Shortened URL (Convenient)
 
 ```bash
-curl -fsSL http://bit.ly/47KeOMh | bash
+curl -fsSL https://bit.ly/47KeOMh | bash
 ```
 
 ### Option 3: With wget
@@ -31,20 +31,7 @@ cp -r claude-config/.claude .
 rm -rf claude-config
 ```
 
-### Global Install (All Projects)
-
-Install globally to `~/.claude/` so guidelines and skills apply to every project:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh | bash -s -- --global
-```
-
-This places files at the correct global paths:
-- `~/.claude/CLAUDE.md` - Main guidelines
-- `~/.claude/.claude/*.md` - Imported guideline files (resolves `@.claude/` imports)
-- `~/.claude/skills/*/` - Skills available in all sessions
-
-> **Project vs Global:** Use project install when you want per-project customization (different commands, stack-specific rules). Use global install for shared defaults across all projects. Project-level files override global ones.
+The installer is interactive — it will ask whether to install globally or for the current project.
 
 ---
 
@@ -88,7 +75,7 @@ claude-config/
 - `/commit` - Create git commits with proper format
 - `/merge` - Squash merge feature branches to main
 - `/issue` - Create GitHub issues (features & bugs)
-- `/review` - Brutally honest code review (3 parallel reviewers)
+- `/review` - Brutally honest code review (2 parallel reviewers)
 
 ✅ **Production-Ready**
 - Used and tested in real projects
@@ -186,7 +173,6 @@ This gives Claude complete context while keeping the main file scannable.
 ## 📚 Documentation
 
 - **Installation**: This README
-- **Best Practices**: See `CLAUDE_MD_BEST_PRACTICES_OFFICIAL.md` (included in this repo)
 
 ---
 
@@ -196,9 +182,8 @@ This gives Claude complete context while keeping the main file scannable.
 |--------|---------|
 | **GitHub URL (curl)** | `curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh \| bash` |
 | **GitHub URL (wget)** | `wget -qO- https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh \| bash` |
-| **Shortened (curl)** | `curl -fsSL http://bit.ly/47KeOMh \| bash` |
-| **Shortened (wget)** | `wget -qO- http://bit.ly/47KeOMh \| bash` |
-| **Global (curl)** | `curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh \| bash -s -- --global` |
+| **Shortened (curl)** | `curl -fsSL https://bit.ly/47KeOMh \| bash` |
+| **Shortened (wget)** | `wget -qO- https://bit.ly/47KeOMh \| bash` |
 | **Git Clone** | `git clone https://github.com/MrKnights1/claude-config.git` |
 
 ---
@@ -207,7 +192,7 @@ This gives Claude complete context while keeping the main file scannable.
 
 1. **Use the `#` key** in Claude Code to quickly update CLAUDE.md during development
 2. **Commit CLAUDE.md changes** with your feature commits so the team benefits
-3. **Share with your team** - Use official GitHub URL or shortened link (`http://bit.ly/47KeOMh`)
+3. **Share with your team** - Use official GitHub URL or shortened link (`https://bit.ly/47KeOMh`)
 4. **Customize per project** but keep core security/quality rules consistent
 5. **Review periodically** - remove guidelines that don't improve Claude's output
 
@@ -264,7 +249,7 @@ Free to use in all your projects. No attribution needed.
 
 - **Repository**: https://github.com/MrKnights1/claude-config
 - **Official Install**: `curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh | bash`
-- **Shortened Install** (alternative): http://bit.ly/47KeOMh
+- **Shortened Install** (alternative): https://bit.ly/47KeOMh
 - **Claude Code Docs**: https://docs.claude.com/en/docs/claude-code
 
 ---

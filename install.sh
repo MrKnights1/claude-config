@@ -1,9 +1,7 @@
 #!/bin/bash
 # CLAUDE.md Quick Installer
 # Fetches CLAUDE.md configuration from GitHub repository
-# Usage:
-#   Project install: curl -fsSL <url> | bash
-#   Global install:  curl -fsSL <url> | bash -s -- --global
+# Usage: curl -fsSL <url> | bash
 
 set -e
 
@@ -14,20 +12,28 @@ GITHUB_BRANCH="${CLAUDE_GITHUB_BRANCH:-main}"
 BASE_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}"
 
 # Colors
+RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Detect install mode
-INSTALL_MODE="project"
-for arg in "$@"; do
-    if [ "$arg" = "--global" ]; then
-        INSTALL_MODE="global"
-    fi
-done
-
 GLOBAL_DIR="$HOME/.claude"
+
+# Prompt helper — reads from /dev/tty so it works with curl | bash
+ask() {
+    local prompt="$1"
+    local default="$2"
+    local reply
+    if (echo -n "" > /dev/tty) 2>/dev/null; then
+        echo -en "${YELLOW}${prompt}${NC} " > /dev/tty
+        read -r reply < /dev/tty
+    else
+        echo -e "${YELLOW}Non-interactive mode: using default '${default}' for: ${prompt}${NC}" >&2
+        reply="$default"
+    fi
+    echo "${reply:-$default}"
+}
 
 # Download helper
 download_file() {
@@ -38,9 +44,9 @@ download_file() {
     if command -v curl &> /dev/null; then
         curl -fsSL "$url" -o "$dest"
     elif command -v wget &> /dev/null; then
-        wget -q "$url" -O "$dest"
+        wget -q "$url" -O "$dest" || { echo -e "${RED}Download failed: $url${NC}"; exit 1; }
     else
-        echo -e "${YELLOW}Neither curl nor wget found. Please install one.${NC}"
+        echo -e "${RED}Neither curl nor wget found. Please install one.${NC}"
         exit 1
     fi
 }
@@ -64,12 +70,29 @@ skill_dirs=(
     "review"
 )
 
+echo -e "${BLUE}CLAUDE.md Installer${NC}"
+echo -e "${BLUE}================================${NC}\n"
+
+# Ask: install mode
+INSTALL_MODE=$(ask "Install globally or for this project? (g/p)" "p")
+case "$INSTALL_MODE" in
+    g|G|global) INSTALL_MODE="global" ;;
+    *) INSTALL_MODE="project" ;;
+esac
+echo -e "Mode: ${GREEN}${INSTALL_MODE}${NC}\n"
+
 if [ "$INSTALL_MODE" = "global" ]; then
-    echo -e "${BLUE}CLAUDE.md Global Installer${NC}"
-    echo -e "${BLUE}================================${NC}\n"
+
+    # Ask: attribution
+    DISABLE_ATTR=$(ask "Disable commit/PR attribution? (y/n)" "n")
+
+    # Warn if overwriting existing files
+    if [ -f "$GLOBAL_DIR/CLAUDE.md" ]; then
+        echo -e "${YELLOW}Warning: Existing files in ~/.claude/ will be overwritten.${NC}"
+    fi
 
     # Create directories
-    echo -e "${YELLOW}Creating directories...${NC}"
+    echo -e "\n${YELLOW}Creating directories...${NC}"
     mkdir -p "$GLOBAL_DIR/.claude"
     for skill in "${skill_dirs[@]}"; do
         mkdir -p "$GLOBAL_DIR/skills/$skill"
@@ -94,7 +117,33 @@ if [ "$INSTALL_MODE" = "global" ]; then
 
     echo -e "\n${GREEN}All files downloaded successfully!${NC}\n"
 
-    echo -e "${BLUE}================================${NC}"
+    # Disable attribution if requested
+    case "$DISABLE_ATTR" in
+        y|Y|yes)
+            SETTINGS_FILE="$GLOBAL_DIR/settings.json"
+            if [ -f "$SETTINGS_FILE" ]; then
+                if command -v jq &> /dev/null; then
+                    echo -e "${YELLOW}Updating settings.json...${NC}"
+                    jq '.attribution.commit = "" | .attribution.pr = ""' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp"
+                    if [ -s "$SETTINGS_FILE.tmp" ]; then
+                        mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+                        echo -e "${GREEN}Attribution disabled in settings.json${NC}"
+                    else
+                        rm -f "$SETTINGS_FILE.tmp"
+                        echo -e "${RED}Error: settings.json merge produced empty output${NC}"
+                    fi
+                else
+                    echo -e "${YELLOW}jq not found, skipping settings.json update. Install jq or add attribution manually.${NC}"
+                fi
+            else
+                echo -e "${YELLOW}Creating settings.json...${NC}"
+                printf '{\n  "attribution": {\n    "commit": "",\n    "pr": ""\n  }\n}\n' > "$SETTINGS_FILE"
+                echo -e "${GREEN}Attribution disabled in settings.json${NC}"
+            fi
+            ;;
+    esac
+
+    echo -e "\n${BLUE}================================${NC}"
     echo -e "${GREEN}Global installation complete!${NC}"
     echo -e "${BLUE}================================${NC}\n"
 
@@ -105,17 +154,15 @@ if [ "$INSTALL_MODE" = "global" ]; then
 
     echo -e "${YELLOW}Next steps:${NC}"
     echo -e "  1. Start a new Claude Code session"
-    echo -e "  2. Skills (/commit, /merge, /issue) are now available globally"
+    echo -e "  2. Skills (/commit, /merge, /issue, /review) are now available globally"
     echo -e "  3. Guidelines apply to all projects without a project-level CLAUDE.md\n"
 
     echo -e "${BLUE}Tip:${NC} Project-level CLAUDE.md files override the global one.\n"
 
 else
-    echo -e "${BLUE}CLAUDE.md Quick Installer${NC}"
-    echo -e "${BLUE}================================${NC}\n"
 
     # Create directories
-    echo -e "${YELLOW}Creating directories...${NC}"
+    echo -e "\n${YELLOW}Creating directories...${NC}"
     mkdir -p .claude
     for skill in "${skill_dirs[@]}"; do
         mkdir -p ".claude/skills/$skill"
