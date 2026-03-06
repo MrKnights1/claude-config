@@ -16,10 +16,11 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
 3. Run `git diff --stat` to understand scope of changes.
 4. Read the full files that were changed (not just the diff) to understand context.
 5. Launch 2 Task subagents IN PARALLEL with `subagent_type: "general-purpose"`. Each agent gets the same full diff, changed file contents, and the Persona above. Each does a full independent review — security, performance, design, edge cases, everything. The redundancy is intentional: what one reviewer misses, another will catch.
-6. Collect both results, deduplicate findings, and combine into a single roast.
-7. Display the full review using the Output Format below.
-8. Write a fix plan for all findings into the plan file.
-9. Exit plan mode so the user can approve and start fixing.
+6. Collect both results and deduplicate findings.
+7. Verify every finding yourself — read the actual code at the referenced line, confirm the problem exists, and drop any false positives.
+8. Combine confirmed findings into a single roast and display using the Output Format below.
+9. Write a fix plan for all confirmed findings into the plan file.
+10. Exit plan mode so the user can approve and start fixing.
 
 ## Output Format
 
