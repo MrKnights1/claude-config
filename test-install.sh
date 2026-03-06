@@ -142,17 +142,9 @@ echo -e "\n${YELLOW}6. Global install creates correct structure${NC}"
 # ============================================================
 setup
 mkdir -p "$TEST_DIR/home/.claude"
-# Simulate global install by sourcing with overridden variables
 cd "$TEST_DIR"
-GLOBAL_DIR="$TEST_DIR/home/.claude"
-# We can't easily trigger global mode non-interactively (default is project),
-# so we test the file layout by manually calling the download logic.
-# Instead, test via script modification:
-HOME="$TEST_DIR/home" INSTALL_MODE_OVERRIDE=global bash -c '
-    export HOME="'"$TEST_DIR/home"'"
-    # Patch ask() to return "g" for first call, "n" for second
-    source <(sed "s|if (echo -n \"\" > /dev/tty) 2>/dev/null; then|if false; then|" "'"$INSTALL_SCRIPT"'" | sed "0,/reply=\"\$default\"/s/reply=\"\$default\"/reply=\"g\"/" | sed "0,/reply=\"\$default\"/{//!b;s/reply=\"\$default\"/reply=\"n\"/}")
-' 2>&1 > /dev/null || true
+# Use CLAUDE_INSTALL_RESPONSES: "g" for mode, "n" for attribution
+HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="g,n" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null || true
 
 assert_file_exists "$TEST_DIR/home/.claude/CLAUDE.md" "global CLAUDE.md created"
 assert_file_exists "$TEST_DIR/home/.claude/.claude/security.md" "global security.md in .claude/.claude/"
@@ -259,5 +251,9 @@ fi
 echo -e "================================\n"
 
 cd "$SCRIPT_DIR"
-rm -rf "$TEST_DIR"
+if [ "$FAILED" -eq 0 ]; then
+    rm -rf "$TEST_DIR"
+else
+    echo -e "${YELLOW}Test artifacts preserved at: $TEST_DIR${NC}"
+fi
 exit "$FAILED"

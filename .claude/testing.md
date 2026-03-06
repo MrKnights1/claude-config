@@ -137,18 +137,24 @@ describe('POST /api/users', () => {
 - Simple data transformations
 - Integration test dependencies (use real DB)
 
-### Mock Patterns
+### Mock Patterns (Jest)
 ```typescript
-// Mock external service
 jest.mock('../services/emailService', () => ({
   sendEmail: jest.fn().mockResolvedValue({ success: true })
 }));
-
-// Mock time
 jest.useFakeTimers();
 jest.setSystemTime(new Date('2025-01-01'));
+process.env.API_KEY = 'test-key';
+```
 
-// Mock environment
+### Mock Patterns (Vitest / bun test)
+```typescript
+import { vi } from 'vitest';
+vi.mock('../services/emailService', () => ({
+  sendEmail: vi.fn().mockResolvedValue({ success: true })
+}));
+vi.useFakeTimers();
+vi.setSystemTime(new Date('2025-01-01'));
 process.env.API_KEY = 'test-key';
 ```
 

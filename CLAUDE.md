@@ -5,8 +5,6 @@
 
 ---
 
----
-
 ## Verification Standards
 
 **IMPORTANT: NEVER claim something is working, running, or accessible unless you have actually verified it**
@@ -68,7 +66,7 @@ For comprehensive guidelines on specific topics, see:
 
 ### API/Backend Errors
 
-- Return consistent error format: `{ success: false, error: { message, code } }`
+- Return consistent error format: `{ success: false, error: { code, message, details?, requestId? } }`
 - Log errors server-side with request ID and context
 - Never expose stack traces or internal details to clients
 - Use appropriate HTTP status codes (400 for client errors, 500 for server errors)

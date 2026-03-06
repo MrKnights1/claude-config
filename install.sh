@@ -3,7 +3,7 @@
 # Fetches CLAUDE.md configuration from GitHub repository
 # Usage: curl -fsSL <url> | bash
 
-set -e
+set -euo pipefail
 
 # GitHub repository configuration
 GITHUB_USER="${CLAUDE_GITHUB_USER:-MrKnights1}"
@@ -11,21 +11,40 @@ GITHUB_REPO="${CLAUDE_GITHUB_REPO:-claude-config}"
 GITHUB_BRANCH="${CLAUDE_GITHUB_BRANCH:-main}"
 BASE_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+# Colors (disabled when stdout is not a terminal)
+if [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    BLUE='\033[0;34m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m'
+else
+    RED=''
+    GREEN=''
+    BLUE=''
+    YELLOW=''
+    NC=''
+fi
 
 GLOBAL_DIR="$HOME/.claude"
 
 # Prompt helper — reads from /dev/tty so it works with curl | bash
+# Set CLAUDE_INSTALL_RESPONSES="val1,val2,..." to provide answers non-interactively (for testing)
+if [ -n "${CLAUDE_INSTALL_RESPONSES:-}" ]; then
+    _ASK_INDEX_FILE=$(mktemp)
+    echo "0" > "$_ASK_INDEX_FILE"
+fi
 ask() {
     local prompt="$1"
     local default="$2"
     local reply
-    if (echo -n "" > /dev/tty) 2>/dev/null; then
+    if [ -n "${CLAUDE_INSTALL_RESPONSES:-}" ]; then
+        local idx
+        idx=$(cat "$_ASK_INDEX_FILE")
+        reply=$(echo "$CLAUDE_INSTALL_RESPONSES" | cut -d',' -f$((idx + 1)))
+        echo $((idx + 1)) > "$_ASK_INDEX_FILE"
+        echo -e "${YELLOW}Auto-response '${reply:-$default}' for: ${prompt}${NC}" >&2
+    elif (echo -n "" > /dev/tty) 2>/dev/null; then
         echo -en "${YELLOW}${prompt}${NC} " > /dev/tty
         read -r reply < /dev/tty
     else
@@ -42,11 +61,11 @@ download_file() {
 
     mkdir -p "$(dirname "$dest")"
     if command -v curl &> /dev/null; then
-        curl -fsSL "$url" -o "$dest"
+        curl -fsSL "$url" -o "$dest" || { echo -e "${RED}Download failed: $url${NC}" >&2; exit 1; }
     elif command -v wget &> /dev/null; then
-        wget -q "$url" -O "$dest" || { echo -e "${RED}Download failed: $url${NC}"; exit 1; }
+        wget -q "$url" -O "$dest" || { echo -e "${RED}Download failed: $url${NC}" >&2; exit 1; }
     else
-        echo -e "${RED}Neither curl nor wget found. Please install one.${NC}"
+        echo -e "${RED}Neither curl nor wget found. Please install one.${NC}" >&2
         exit 1
     fi
 }
@@ -86,9 +105,14 @@ if [ "$INSTALL_MODE" = "global" ]; then
     # Ask: attribution
     DISABLE_ATTR=$(ask "Disable commit/PR attribution? (y/n)" "n")
 
-    # Warn if overwriting existing files
+    # Warn and confirm if overwriting existing files
     if [ -f "$GLOBAL_DIR/CLAUDE.md" ]; then
-        echo -e "${YELLOW}Warning: Existing files in ~/.claude/ will be overwritten.${NC}"
+        echo -e "${YELLOW}Warning: Existing files in ~/.claude/ will be overwritten.${NC}" >&2
+        CONFIRM=$(ask "Continue? (y/n)" "n")
+        case "$CONFIRM" in
+            y|Y|yes) ;;
+            *) echo -e "${RED}Installation cancelled.${NC}" >&2; exit 0 ;;
+        esac
     fi
 
     # Create directories
@@ -130,10 +154,10 @@ if [ "$INSTALL_MODE" = "global" ]; then
                         echo -e "${GREEN}Attribution disabled in settings.json${NC}"
                     else
                         rm -f "$SETTINGS_FILE.tmp"
-                        echo -e "${RED}Error: settings.json merge produced empty output${NC}"
+                        echo -e "${RED}Error: settings.json merge produced empty output${NC}" >&2
                     fi
                 else
-                    echo -e "${YELLOW}jq not found, skipping settings.json update. Install jq or add attribution manually.${NC}"
+                    echo -e "${YELLOW}jq not found, skipping settings.json update. Install jq or add attribution manually.${NC}" >&2
                 fi
             else
                 echo -e "${YELLOW}Creating settings.json...${NC}"
@@ -160,6 +184,18 @@ if [ "$INSTALL_MODE" = "global" ]; then
     echo -e "${BLUE}Tip:${NC} Project-level CLAUDE.md files override the global one.\n"
 
 else
+
+    # Validate project root (only warn interactively)
+    if [ ! -d ".git" ] && [ ! -f "package.json" ] && [ ! -f "composer.json" ] && [ ! -f "Cargo.toml" ] && [ ! -f "go.mod" ] && [ ! -f "requirements.txt" ]; then
+        if (echo -n "" > /dev/tty) 2>/dev/null; then
+            echo -e "${YELLOW}Warning: This doesn't look like a project root (no .git, package.json, etc.)${NC}" >&2
+            CONFIRM=$(ask "Install here anyway? (y/n)" "y")
+            case "$CONFIRM" in
+                y|Y|yes) ;;
+                *) echo -e "${RED}Installation cancelled.${NC}" >&2; exit 0 ;;
+            esac
+        fi
+    fi
 
     # Create directories
     echo -e "\n${YELLOW}Creating directories...${NC}"

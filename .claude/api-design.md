@@ -370,6 +370,8 @@ Idempotency-Key: unique-request-id-123
 
 # Logging Standards
 
+> For security-specific logging requirements, see `security.md`.
+
 ## What to Log
 
 - All security events (authentication, authorization failures)

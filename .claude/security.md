@@ -1,6 +1,6 @@
 # Security Guidelines
 
-**Based on OWASP Application Security Verification Standard (ASVS) v5.0.0**
+**Based on OWASP Application Security Verification Standard (ASVS) v4.0.3**
 
 This document provides actionable security requirements following OWASP ASVS. When writing code, ALWAYS follow these guidelines to ensure application security.
 
@@ -10,7 +10,7 @@ This document provides actionable security requirements following OWASP ASVS. Wh
 - Use parameterized queries for all database operations
 - Validate AND sanitize all user input
 - Use context-appropriate output encoding (HTML, JavaScript, URL)
-- Hash passwords with bcrypt/scrypt/Argon2 (minimum 10 rounds)
+- Hash passwords with bcrypt/scrypt/Argon2 (minimum cost factor 12)
 - Use cryptographically secure random generation for security tokens (crypto.randomBytes, random_bytes)
 - Implement CSRF protection on state-changing requests
 - Set secure session cookie flags (httpOnly, secure, sameSite)
@@ -45,7 +45,7 @@ This document provides actionable security requirements following OWASP ASVS. Wh
 - Use separate environment variables for different environments (dev, staging, production)
 
 ### Password Storage (ASVS V6)
-- Hash passwords using bcrypt, scrypt, or Argon2 (minimum 10 rounds for bcrypt)
+- Hash passwords using bcrypt, scrypt, or Argon2 (minimum cost factor 12 for bcrypt)
   - PHP: password_hash() with PASSWORD_BCRYPT or PASSWORD_ARGON2ID
   - Node.js: bcrypt or argon2 library
 - NEVER store password hints or security questions
@@ -78,7 +78,7 @@ This document provides actionable security requirements following OWASP ASVS. Wh
   - PHP: htmlspecialchars($input, ENT_QUOTES, 'UTF-8')
   - React: Use JSX (auto-escapes), or DOMPurify for rich content
   - Node.js: Use libraries like validator, xss, or DOMPurify
-- **WYSIWYG Content**: Sanitize all untrusted HTML from editors using well-known libraries (DOMPurify, Bleach)
+- **WYSIWYG Content**: Sanitize all untrusted HTML from editors using well-known libraries (DOMPurify, nh3)
 - **Command Injection**: Use parameterized/safe APIs for OS commands, avoid system() and exec() with user input
 - **XML External Entity (XXE)**: Configure XML parsers to disable external entity processing
 - **Template Injection**: Avoid dynamic template generation with user input
@@ -121,7 +121,7 @@ This document provides actionable security requirements following OWASP ASVS. Wh
   - Consistent error messages ("Invalid credentials" not "Username not found")
   - Consistent response times for valid and invalid users
 - Implement rate limiting on authentication endpoints:
-  - 3-5 attempts per 15 minutes for login
+  - 5 attempts per 15 minutes for login
   - 3 attempts per 15 minutes for password reset
   - Include file locking to prevent race conditions in file-based systems
   - Use express-rate-limit (Node.js) or custom file/Redis-based limiting
@@ -204,9 +204,43 @@ Implement two types of timeouts:
 - Validate token on server before processing request
 - Rotate token after successful validation to prevent reuse
 - Use CSRF middleware:
-  - Express.js: csurf middleware
+  - Express.js: csrf-csrf or csrf-sync middleware
   - PHP: Custom implementation or framework-provided (Laravel, Symfony)
   - React/SPA: Include token in request headers (X-CSRF-Token)
+
+## JWT Security
+
+### Token Validation
+- ALWAYS validate the `alg` header and reject `none` and unexpected algorithms
+- Verify signature using the correct key for the algorithm (RSA public key for RS256, shared secret for HS256)
+- Validate all registered claims: `exp` (expiry), `iss` (issuer), `aud` (audience), `nbf` (not before)
+- Reject tokens with missing required claims
+
+### Token Storage & Lifecycle
+- Store access tokens in memory, not in localStorage (vulnerable to XSS)
+- Use short-lived access tokens (5-15 minutes)
+- Use refresh tokens stored in httpOnly secure cookies with rotation
+- Revoke refresh tokens on logout, password change, and suspicious activity
+- Maintain a server-side deny list for revoked tokens (or use short expiry + refresh rotation)
+
+### Common Pitfalls
+- Do not use symmetric signing (HS256) with a weak or guessable secret
+- Do not embed sensitive data (passwords, PII) in JWT payload as it is base64-encoded, not encrypted
+- Do not accept JWTs from untrusted sources without signature verification
+- Be aware of algorithm confusion attacks (RS256 vs HS256) and always enforce expected algorithm
+
+## SSRF Prevention
+
+### Request Validation
+- Validate and allowlist destination URLs/hostnames before making server-side HTTP requests
+- Block requests to private/internal IP ranges: `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `::1`, `fc00::/7`
+- Resolve DNS before checking IP ranges to prevent DNS rebinding attacks
+- Disable HTTP redirects in server-side requests, or re-validate the target after each redirect
+
+### Architecture
+- Use an egress proxy for all outbound HTTP requests from the server
+- Implement network-level controls (firewall rules) to restrict server-to-server communication
+- Run services that make external requests in isolated network segments
 
 ## HTTP Security Headers
 
@@ -217,7 +251,7 @@ ALWAYS set these security headers (via middleware, web server config, or framewo
 - **X-Content-Type-Options: nosniff** - Prevent MIME type sniffing
 - **Strict-Transport-Security: max-age=31536000; includeSubDomains; preload** - Enforce HTTPS
 - **Referrer-Policy: strict-origin-when-cross-origin** - Control referrer information
-- **X-XSS-Protection: 1; mode=block** - Enable XSS filter for legacy browsers
+- **X-XSS-Protection: 0** - Disable legacy XSS filter (can introduce vulnerabilities in older browsers)
 
 ### Content Security Policy (CSP)
 - **Content-Security-Policy** - Restrict resource loading to prevent XSS:
@@ -299,7 +333,7 @@ ALWAYS set these security headers (via middleware, web server config, or framewo
 - Use only approved hash functions (SHA-256, SHA-384, SHA-512, SHA-3)
 - NEVER use MD5, SHA-1, or other compromised algorithms
 - Use computationally intensive key derivation functions for password storage:
-  - bcrypt (minimum 10 rounds)
+  - bcrypt (minimum cost factor 12)
   - scrypt
   - Argon2id (recommended)
 - Use 256-bit minimum output for collision-resistant hashing

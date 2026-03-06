@@ -40,6 +40,9 @@ The installer is interactive — it will ask whether to install globally or for 
 ```
 claude-config/
 ├── CLAUDE.md                  # Main config (optimized)
+├── install.sh                 # Interactive installer (curl | bash)
+├── test-install.sh            # Installer test suite
+├── README.md                  # This file
 └── .claude/                   # Modular guidelines
     ├── security.md           # Security best practices
     ├── security-review.md    # Security review process
@@ -59,7 +62,7 @@ claude-config/
 ## ✨ Features
 
 ✅ **Follows Official Best Practices**
-- Main file: 200 lines (recommended 100-200)
+- Main file: ~130 lines (recommended under 200)
 - Modular design with `@.claude/*.md` imports
 - Concise and scannable
 
@@ -125,19 +128,16 @@ git commit -m "Add CLAUDE.md for Claude Code"
 
 After installation, customize for your project:
 
-### 1. Update Common Commands (Required)
+### 1. Customize for Your Project (Required)
 
-Edit `CLAUDE.md` and replace the example commands:
+After installing, edit `CLAUDE.md` to add your project-specific details (tech stack, common commands, environment notes). Use `/init` in Claude Code or follow the template in `.claude/project-init.md`.
 
-```bash
-### Common Commands (Update for your project)
-```bash
-# YOUR actual commands here:
-bun run dev       # Start development server
-bun run build     # Build for production
-bun test          # Run tests
-bun run lint      # Run linter
-```
+Example commands to add:
+
+    bun run dev       # Start development server
+    bun run build     # Build for production
+    bun test          # Run tests
+    bun run lint      # Run linter
 
 ### 2. Adjust Guidelines (Optional)
 
@@ -163,7 +163,7 @@ git commit -m "Customize CLAUDE.md for project"
 The `@.claude/security.md` syntax in CLAUDE.md automatically imports those files into Claude's context.
 
 When Claude Code starts, it loads:
-1. Your main `CLAUDE.md` (200 lines of essential rules)
+1. Your main `CLAUDE.md` (essential rules, under 200 lines)
 2. All imported files from `.claude/` directory
 
 This gives Claude complete context while keeping the main file scannable.

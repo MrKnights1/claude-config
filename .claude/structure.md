@@ -60,15 +60,17 @@ project-root/
 - NEVER mix source and configuration in same directory
 
 ### Tests
-- Place all tests in `/tests` directory mirroring `/src` structure
+- Unit tests: co-locate next to source file (`Button.test.tsx` next to `Button.tsx`) or in `/tests` mirroring `/src`
 - Place integration tests in `/tests/integration`
 - Place E2E tests in `/tests/e2e`
+- Pick one convention per project and be consistent
 
 ### Configuration
 - Root level: `package.json`, `tsconfig.json`, `.env.example`, `.gitignore`
 - Framework configs in root: `vite.config.ts`, `next.config.js`, etc.
 - Tool configs in root: `.eslintrc`, `.prettierrc`, `jest.config.js`
-- NEVER place config files inside `/src`
+- Do not place tool/framework config files inside `/src`
+- App configuration (database setup, env parsing) goes in `/src/config/`
 
 ---
 
