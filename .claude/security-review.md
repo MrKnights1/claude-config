@@ -89,7 +89,7 @@ ALWAYS escalate to human review when:
 
 ### Dependencies
 - [ ] New dependencies from trusted sources
-- [ ] No known vulnerabilities (`npm audit` / `composer audit`)
+- [ ] No known vulnerabilities (`bun audit` / `composer audit`)
 - [ ] Dependencies actively maintained
 - [ ] Minimal new dependencies added
 
@@ -210,7 +210,7 @@ grep -r "password\|secret\|api_key\|token" --include="*.ts" --include="*.js" src
 grep -r "query.*\${" --include="*.ts" --include="*.js" src/
 
 # Run dependency audit
-npm audit
+bun audit
 # or
 composer audit
 

@@ -133,10 +133,10 @@ Edit `CLAUDE.md` and replace the example commands:
 ### Common Commands (Update for your project)
 ```bash
 # YOUR actual commands here:
-npm run dev       # Start development server
-npm run build     # Build for production
-npm test          # Run tests
-npm run lint      # Run linter
+bun run dev       # Start development server
+bun run build     # Build for production
+bun test          # Run tests
+bun run lint      # Run linter
 ```
 
 ### 2. Adjust Guidelines (Optional)

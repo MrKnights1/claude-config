@@ -248,20 +248,20 @@ Brief description of the project.
 - PostgreSQL >= 14
 
 ### Installation
-npm install
+bun install
 
 ### Environment Setup
 cp .env.example .env
 # Edit .env with your values
 
 ### Running Locally
-npm run dev
+bun run dev
 
 ## Available Scripts
-- npm run dev - Start development server
-- npm run build - Build for production
-- npm test - Run tests
-- npm run lint - Check code style
+- bun run dev - Start development server
+- bun run build - Build for production
+- bun test - Run tests
+- bun run lint - Check code style
 
 ## Project Structure
 Brief overview of directory structure.
@@ -316,7 +316,7 @@ After any code change or refactor:
 
 ### Verification
 - Run linter to catch unused code
-- Check for unused dependencies (`npm-check`, `depcheck`)
+- Check for unused dependencies (`depcheck`)
 - Review git diff before committing
 - Run full test suite
 

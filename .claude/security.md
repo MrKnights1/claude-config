@@ -447,11 +447,11 @@ Each log entry should include:
 
 ### Regular Updates
 - Run dependency updates regularly:
-  - Node.js: `npm update` or `bun update`
+  - Node.js: `bun update`
   - PHP: `composer update`
-  - React: Update via npm/bun
+  - React: Update via bun
 - Check for security vulnerabilities:
-  - Node.js: `npm audit` or `bun audit`
+  - Node.js: `bun audit`
   - PHP: `composer audit`
 
 ### Dependency Security
