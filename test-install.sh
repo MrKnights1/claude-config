@@ -47,16 +47,16 @@ assert_file_not_empty() {
 }
 
 assert_contains() {
-    if echo "$1" | grep -q "$2"; then
+    if printf '%s\n' "$1" | grep -qF -- "$2"; then
         pass "$3"
     else
-        fail "$3" "expected to contain '$2'"
+        fail "$3" "expected to contain '$2' in: ${1:0:200}"
     fi
 }
 
 assert_not_contains() {
-    if echo "$1" | grep -q "$2"; then
-        fail "$3" "should not contain '$2'"
+    if printf '%s\n' "$1" | grep -qF -- "$2"; then
+        fail "$3" "should not contain '$2' in: ${1:0:200}"
     else
         pass "$3"
     fi
@@ -66,7 +66,8 @@ assert_not_contains() {
 echo -e "\n${YELLOW}1. Non-interactive mode uses defaults${NC}"
 # ============================================================
 setup
-HOME="$TEST_DIR/home" mkdir -p "$TEST_DIR/home"
+mkdir -p "$TEST_DIR/home"
+# Note: this test requires no controlling terminal (CI/piped). In a terminal, ask() reads /dev/tty.
 OUTPUT=$(HOME="$TEST_DIR/home" bash "$INSTALL_SCRIPT" < /dev/null 2>&1) || true
 
 assert_contains "$OUTPUT" "Non-interactive mode" "shows non-interactive warning"
@@ -77,8 +78,7 @@ assert_contains "$OUTPUT" "project" "defaults to project mode"
 echo -e "\n${YELLOW}2. Project install creates correct structure${NC}"
 # ============================================================
 setup
-mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project"
-HOME="$TEST_DIR/home" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null
+(mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project" && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="p,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null)
 
 assert_file_exists "$TEST_DIR/project/CLAUDE.md" "CLAUDE.md created"
 assert_file_exists "$TEST_DIR/project/.claude/security.md" "security.md created"
@@ -101,9 +101,7 @@ assert_file_not_empty "$TEST_DIR/project/.claude/security.md" "security.md is no
 echo -e "\n${YELLOW}3. Project install updates .gitignore${NC}"
 # ============================================================
 setup
-mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project"
-echo "node_modules/" > .gitignore
-HOME="$TEST_DIR/home" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null
+(mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project" && echo "node_modules/" > .gitignore && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="p,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null)
 
 GITIGNORE=$(cat "$TEST_DIR/project/.gitignore")
 assert_contains "$GITIGNORE" ".claude/settings.local.json" ".gitignore updated with settings.local.json"
@@ -113,9 +111,7 @@ assert_contains "$GITIGNORE" "node_modules" ".gitignore preserves existing entri
 echo -e "\n${YELLOW}4. Project install skips .gitignore if already has entry${NC}"
 # ============================================================
 setup
-mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project"
-echo ".claude/settings.local.json" > .gitignore
-HOME="$TEST_DIR/home" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null
+(mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project" && echo ".claude/settings.local.json" > .gitignore && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="p,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null)
 
 LINE_COUNT=$(grep -c "settings.local.json" "$TEST_DIR/project/.gitignore")
 if [ "$LINE_COUNT" -eq 1 ]; then
@@ -128,8 +124,7 @@ fi
 echo -e "\n${YELLOW}5. Project install skips .gitignore if none exists${NC}"
 # ============================================================
 setup
-mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project"
-HOME="$TEST_DIR/home" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null
+(mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project" && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="p,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null)
 
 if [ ! -f "$TEST_DIR/project/.gitignore" ]; then
     pass "no .gitignore created when none existed"
@@ -142,9 +137,8 @@ echo -e "\n${YELLOW}6. Global install creates correct structure${NC}"
 # ============================================================
 setup
 mkdir -p "$TEST_DIR/home/.claude"
-cd "$TEST_DIR"
-# Use CLAUDE_INSTALL_RESPONSES: "g" for mode, "n" for attribution
-HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="g,n" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null || true
+# Use CLAUDE_INSTALL_RESPONSES: "g" for mode, "n" for attribution, "y" for apply
+(cd "$TEST_DIR" && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="g,n,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null) || true
 
 assert_file_exists "$TEST_DIR/home/.claude/CLAUDE.md" "global CLAUDE.md created"
 assert_file_exists "$TEST_DIR/home/.claude/.claude/security.md" "global security.md in .claude/.claude/"
@@ -196,9 +190,10 @@ FATAL_LINE=$(grep "Neither curl nor wget" "$INSTALL_SCRIPT")
 assert_contains "$FATAL_LINE" 'RED' "fatal error uses RED color"
 
 # ============================================================
-echo -e "\n${YELLOW}11. wget has error handling${NC}"
+echo -e "\n${YELLOW}11. wget has HTTPS enforcement and error handling${NC}"
 # ============================================================
 WGET_LINE=$(grep "wget -q" "$INSTALL_SCRIPT")
+assert_contains "$WGET_LINE" "--https-only" "wget enforces HTTPS"
 assert_contains "$WGET_LINE" "exit 1" "wget has exit on failure"
 
 # ============================================================
@@ -220,13 +215,19 @@ assert_contains "$README_CONTENT" "https://bit.ly" "bit.ly URLs use HTTPS"
 assert_contains "$README_CONTENT" "2 parallel" "correct '2 parallel reviewers' count"
 
 # ============================================================
-echo -e "\n${YELLOW}14. Overwrite warning for existing global files${NC}"
+echo -e "\n${YELLOW}14. Hash-based change detection before apply${NC}"
 # ============================================================
-WARN_CHECK=$(grep -c "Existing files.*will be overwritten" "$INSTALL_SCRIPT")
-if [ "$WARN_CHECK" -ge 1 ]; then
-    pass "overwrite warning exists in global install path"
+APPLY_CHECK=$(grep -c "Apply these changes" "$INSTALL_SCRIPT")
+if [ "$APPLY_CHECK" -ge 1 ]; then
+    pass "apply confirmation prompt exists"
 else
-    fail "overwrite warning exists in global install path" "warning not found"
+    fail "apply confirmation prompt exists" "prompt not found"
+fi
+CMP_CHECK=$(grep -c "cmp -s" "$INSTALL_SCRIPT")
+if [ "$CMP_CHECK" -ge 1 ]; then
+    pass "hash comparison with cmp exists"
+else
+    fail "hash comparison with cmp exists" "cmp not found"
 fi
 
 # ============================================================

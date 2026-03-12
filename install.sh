@@ -9,6 +9,24 @@ set -euo pipefail
 GITHUB_USER="${CLAUDE_GITHUB_USER:-MrKnights1}"
 GITHUB_REPO="${CLAUDE_GITHUB_REPO:-claude-config}"
 GITHUB_BRANCH="${CLAUDE_GITHUB_BRANCH:-main}"
+
+# Validate inputs to prevent URL manipulation
+# User/repo: no slashes (prevent path traversal). Branch: allow slashes (feature/foo).
+_valid_name='^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+_valid_branch='^[a-zA-Z0-9][a-zA-Z0-9._/-]*$'
+if [[ ! "$GITHUB_USER" =~ $_valid_name ]]; then
+    echo "Error: GITHUB_USER must contain only alphanumeric characters, dots, hyphens, and underscores." >&2
+    exit 1
+fi
+if [[ ! "$GITHUB_REPO" =~ $_valid_name ]]; then
+    echo "Error: GITHUB_REPO must contain only alphanumeric characters, dots, hyphens, and underscores." >&2
+    exit 1
+fi
+if [[ ! "$GITHUB_BRANCH" =~ $_valid_branch ]]; then
+    echo "Error: GITHUB_BRANCH must contain only alphanumeric characters, dots, hyphens, underscores, and slashes." >&2
+    exit 1
+fi
+
 BASE_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}"
 
 # Colors (disabled when stdout is not a terminal)
@@ -28,10 +46,14 @@ fi
 
 GLOBAL_DIR="$HOME/.claude"
 
+# Temp directory for downloads (cleaned up on exit)
+TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
+
 # Prompt helper — reads from /dev/tty so it works with curl | bash
 # Set CLAUDE_INSTALL_RESPONSES="val1,val2,..." to provide answers non-interactively (for testing)
 if [ -n "${CLAUDE_INSTALL_RESPONSES:-}" ]; then
-    _ASK_INDEX_FILE=$(mktemp)
+    _ASK_INDEX_FILE="$TEMP_DIR/.ask_index"
     echo "0" > "$_ASK_INDEX_FILE"
 fi
 ask() {
@@ -41,7 +63,7 @@ ask() {
     if [ -n "${CLAUDE_INSTALL_RESPONSES:-}" ]; then
         local idx
         idx=$(cat "$_ASK_INDEX_FILE")
-        reply=$(echo "$CLAUDE_INSTALL_RESPONSES" | cut -d',' -f$((idx + 1)))
+        reply=$(printf '%s\n' "$CLAUDE_INSTALL_RESPONSES" | cut -d',' -f$((idx + 1)))
         echo $((idx + 1)) > "$_ASK_INDEX_FILE"
         echo -e "${YELLOW}Auto-response '${reply:-$default}' for: ${prompt}${NC}" >&2
     elif (echo -n "" > /dev/tty) 2>/dev/null; then
@@ -54,20 +76,150 @@ ask() {
     echo "${reply:-$default}"
 }
 
-# Download helper
+# Download helper (downloads to temp dir)
 download_file() {
     local url="$1"
     local dest="$2"
 
     mkdir -p "$(dirname "$dest")"
     if command -v curl &> /dev/null; then
-        curl -fsSL "$url" -o "$dest" || { echo -e "${RED}Download failed: $url${NC}" >&2; exit 1; }
+        curl -fSL --proto =https --connect-timeout 10 --max-time 30 --max-filesize 1048576 "$url" -o "$dest" || { echo -e "${RED}Download failed: $url${NC}" >&2; exit 1; }
     elif command -v wget &> /dev/null; then
-        wget -q "$url" -O "$dest" || { echo -e "${RED}Download failed: $url${NC}" >&2; exit 1; }
+        wget -q --https-only --timeout=30 "$url" -O "$dest" || { echo -e "${RED}Download failed: $url${NC}" >&2; exit 1; }
     else
         echo -e "${RED}Neither curl nor wget found. Please install one.${NC}" >&2
         exit 1
     fi
+
+    # Reject HTML responses (error pages, captive portals)
+    if head -c 50 "$dest" | grep -qi '<\(!DOCTYPE\|html\)'; then
+        echo -e "${RED}Downloaded file appears to be HTML, not markdown: $url${NC}" >&2
+        rm -f "$dest"
+        exit 1
+    fi
+}
+
+# Compare temp downloads with existing files, show changes, and copy over
+# Usage: apply_downloads target_dir file1 file2 ... -- known1 known2 ...
+# Files after "--" are known installer-managed paths for removal detection
+apply_downloads() {
+    local target_dir="$1"
+    shift
+
+    local files=()
+    local known_paths=()
+    local past_separator=false
+    for arg in "$@"; do
+        if [ "$arg" = "--" ]; then
+            past_separator=true
+            continue
+        fi
+        if [ "$past_separator" = true ]; then
+            known_paths+=("$arg")
+        else
+            files+=("$arg")
+        fi
+    done
+
+    local changed=()
+    local new_files=()
+    local removed=()
+
+    for file in "${files[@]}"; do
+        local temp_file="$TEMP_DIR/$file"
+        local dest_file="$target_dir/$file"
+        if [ ! -f "$dest_file" ]; then
+            new_files+=("$file")
+        elif ! cmp -s "$temp_file" "$dest_file"; then
+            changed+=("$file")
+        fi
+    done
+
+    # Detect previously-installed files that are no longer in the current file list
+    for known in "${known_paths[@]}"; do
+        [ -f "$target_dir/$known" ] || continue
+        local found=false
+        for file in "${files[@]}"; do
+            if [ "$file" = "$known" ]; then
+                found=true
+                break
+            fi
+        done
+        if [ "$found" = false ]; then
+            removed+=("$known")
+        fi
+    done
+
+    if [ ${#changed[@]} -eq 0 ] && [ ${#new_files[@]} -eq 0 ] && [ ${#removed[@]} -eq 0 ]; then
+        echo -e "${GREEN}All files are already up to date.${NC}"
+        return 0
+    fi
+
+    if [ ${#new_files[@]} -gt 0 ]; then
+        echo -e "${GREEN}New files:${NC}"
+        for file in "${new_files[@]}"; do
+            echo -e "  + ${file}"
+        done
+    fi
+    if [ ${#changed[@]} -gt 0 ]; then
+        echo -e "${YELLOW}Changed files:${NC}"
+        for file in "${changed[@]}"; do
+            echo -e "  ~ ${file}"
+        done
+    fi
+    if [ ${#removed[@]} -gt 0 ]; then
+        echo -e "${RED}Removed upstream (not in remote):${NC}"
+        for file in "${removed[@]}"; do
+            echo -e "  - ${file}"
+        done
+    fi
+
+    echo ""
+    CONFIRM=$(ask "Apply these changes? (y/n)" "y")
+    case "$CONFIRM" in
+        y|Y|yes) ;;
+        *) echo -e "${RED}Installation cancelled.${NC}" >&2; exit 0 ;;
+    esac
+
+    # Backup changed and removed files before applying
+    local backup_dir=""
+    if [ ${#changed[@]} -gt 0 ] || [ ${#removed[@]} -gt 0 ]; then
+        backup_dir=$(mktemp -d "${TMPDIR:-/tmp}/claude-backup-XXXXXX")
+        for file in "${changed[@]}"; do
+            mkdir -p "$backup_dir/$(dirname "$file")"
+            cp "$target_dir/$file" "$backup_dir/$file"
+        done
+        if [ ${#removed[@]} -gt 0 ]; then
+            for file in "${removed[@]}"; do
+                mkdir -p "$backup_dir/$(dirname "$file")"
+                cp "$target_dir/$file" "$backup_dir/$file"
+            done
+        fi
+        echo -e "${BLUE}Backup saved to: ${backup_dir}${NC}"
+    fi
+
+    if [ ${#new_files[@]} -gt 0 ]; then
+        for file in "${new_files[@]}"; do
+            local dest_file="$target_dir/$file"
+            mkdir -p "$(dirname "$dest_file")"
+            cp "$TEMP_DIR/$file" "$dest_file"
+        done
+    fi
+    if [ ${#changed[@]} -gt 0 ]; then
+        for file in "${changed[@]}"; do
+            local dest_file="$target_dir/$file"
+            mkdir -p "$(dirname "$dest_file")"
+            cp "$TEMP_DIR/$file" "$dest_file"
+        done
+    fi
+
+    if [ ${#removed[@]} -gt 0 ]; then
+        for file in "${removed[@]}"; do
+            rm -f "$target_dir/$file"
+        done
+    fi
+
+    echo -e "${GREEN}Applied ${#new_files[@]} new, ${#changed[@]} updated, ${#removed[@]} removed.${NC}"
 }
 
 # Source files to download
@@ -105,41 +257,44 @@ if [ "$INSTALL_MODE" = "global" ]; then
     # Ask: attribution
     DISABLE_ATTR=$(ask "Disable commit/PR attribution? (y/n)" "n")
 
-    # Warn and confirm if overwriting existing files
-    if [ -f "$GLOBAL_DIR/CLAUDE.md" ]; then
-        echo -e "${YELLOW}Warning: Existing files in ~/.claude/ will be overwritten.${NC}" >&2
-        CONFIRM=$(ask "Continue? (y/n)" "n")
-        case "$CONFIRM" in
-            y|Y|yes) ;;
-            *) echo -e "${RED}Installation cancelled.${NC}" >&2; exit 0 ;;
-        esac
-    fi
 
-    # Create directories
-    echo -e "\n${YELLOW}Creating directories...${NC}"
-    mkdir -p "$GLOBAL_DIR/.claude"
-    for skill in "${skill_dirs[@]}"; do
-        mkdir -p "$GLOBAL_DIR/skills/$skill"
-    done
-
-    # Download CLAUDE.md
-    echo -e "${YELLOW}Downloading configuration files...${NC}"
-    echo -e "  Downloading CLAUDE.md..."
-    download_file "${BASE_URL}/CLAUDE.md" "$GLOBAL_DIR/CLAUDE.md"
-
-    # Download guideline files -> ~/.claude/.claude/*.md
+    # Build file list for global install
+    global_files=("CLAUDE.md")
     for file in "${guideline_files[@]}"; do
-        echo -e "  Downloading .claude/${file}..."
-        download_file "${BASE_URL}/.claude/${file}" "$GLOBAL_DIR/.claude/${file}"
+        global_files+=(".claude/${file}")
     done
-
-    # Download skills -> ~/.claude/skills/*/SKILL.md
     for skill in "${skill_dirs[@]}"; do
-        echo -e "  Downloading skills/${skill}/SKILL.md..."
-        download_file "${BASE_URL}/.claude/skills/${skill}/SKILL.md" "$GLOBAL_DIR/skills/${skill}/SKILL.md"
+        global_files+=("skills/${skill}/SKILL.md")
     done
 
-    echo -e "\n${GREEN}All files downloaded successfully!${NC}\n"
+    # Download all files to temp dir
+    echo -e "\n${YELLOW}Downloading configuration files...${NC}"
+    for file in "${global_files[@]}"; do
+        echo -e "  Downloading ${file}..."
+        # Map source paths: .claude/* comes from repo .claude/*, skills/* from repo .claude/skills/*
+        if [[ "$file" == "CLAUDE.md" ]]; then
+            download_file "${BASE_URL}/CLAUDE.md" "$TEMP_DIR/$file"
+        elif [[ "$file" == .claude/* ]]; then
+            download_file "${BASE_URL}/${file}" "$TEMP_DIR/$file"
+        elif [[ "$file" == skills/* ]]; then
+            download_file "${BASE_URL}/.claude/${file}" "$TEMP_DIR/$file"
+        else
+            echo -e "${RED}Unknown file mapping: $file${NC}" >&2; exit 1
+        fi
+    done
+
+    # Build known paths for removal detection (all paths this installer ever manages in global mode)
+    global_known=("CLAUDE.md")
+    for file in "${guideline_files[@]}"; do
+        global_known+=(".claude/${file}")
+    done
+    for skill in "${skill_dirs[@]}"; do
+        global_known+=("skills/${skill}/SKILL.md")
+    done
+
+    echo ""
+    apply_downloads "$GLOBAL_DIR" "${global_files[@]}" -- "${global_known[@]}"
+    echo ""
 
     # Disable attribution if requested
     case "$DISABLE_ATTR" in
@@ -148,13 +303,14 @@ if [ "$INSTALL_MODE" = "global" ]; then
             if [ -f "$SETTINGS_FILE" ]; then
                 if command -v jq &> /dev/null; then
                     echo -e "${YELLOW}Updating settings.json...${NC}"
-                    jq '.attribution.commit = "" | .attribution.pr = ""' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp"
-                    if [ -s "$SETTINGS_FILE.tmp" ]; then
+                    if jq '.attribution.commit = "" | .attribution.pr = ""' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" 2>/dev/null \
+                       && [ -s "$SETTINGS_FILE.tmp" ] \
+                       && jq . "$SETTINGS_FILE.tmp" > /dev/null 2>&1; then
                         mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
                         echo -e "${GREEN}Attribution disabled in settings.json${NC}"
                     else
                         rm -f "$SETTINGS_FILE.tmp"
-                        echo -e "${RED}Error: settings.json merge produced empty output${NC}" >&2
+                        echo -e "${RED}Error: settings.json merge failed (is settings.json valid JSON?)${NC}" >&2
                     fi
                 else
                     echo -e "${YELLOW}jq not found, skipping settings.json update. Install jq or add attribution manually.${NC}" >&2
@@ -185,10 +341,10 @@ if [ "$INSTALL_MODE" = "global" ]; then
 
 else
 
-    # Validate project root (only warn interactively)
+    # Validate project root
     if [ ! -d ".git" ] && [ ! -f "package.json" ] && [ ! -f "composer.json" ] && [ ! -f "Cargo.toml" ] && [ ! -f "go.mod" ] && [ ! -f "requirements.txt" ]; then
+        echo -e "${YELLOW}Warning: This doesn't look like a project root (no .git, package.json, etc.)${NC}" >&2
         if (echo -n "" > /dev/tty) 2>/dev/null; then
-            echo -e "${YELLOW}Warning: This doesn't look like a project root (no .git, package.json, etc.)${NC}" >&2
             CONFIRM=$(ask "Install here anyway? (y/n)" "y")
             case "$CONFIRM" in
                 y|Y|yes) ;;
@@ -197,38 +353,41 @@ else
         fi
     fi
 
-    # Create directories
-    echo -e "\n${YELLOW}Creating directories...${NC}"
-    mkdir -p .claude
-    for skill in "${skill_dirs[@]}"; do
-        mkdir -p ".claude/skills/$skill"
-    done
-
-    # Download all files
-    echo -e "${YELLOW}Downloading CLAUDE.md configuration...${NC}"
-
-    files=(
-        "CLAUDE.md"
-    )
+    # Build file list for project install
+    project_files=("CLAUDE.md")
     for file in "${guideline_files[@]}"; do
-        files+=(".claude/${file}")
+        project_files+=(".claude/${file}")
     done
     for skill in "${skill_dirs[@]}"; do
-        files+=(".claude/skills/${skill}/SKILL.md")
+        project_files+=(".claude/skills/${skill}/SKILL.md")
     done
 
-    for file in "${files[@]}"; do
+    # Download all files to temp dir
+    echo -e "\n${YELLOW}Downloading configuration files...${NC}"
+    for file in "${project_files[@]}"; do
         echo -e "  Downloading ${file}..."
-        download_file "${BASE_URL}/${file}" "${file}"
+        download_file "${BASE_URL}/${file}" "$TEMP_DIR/$file"
     done
 
-    echo -e "\n${GREEN}All files downloaded successfully!${NC}\n"
+    # Build known paths for removal detection (all paths this installer ever manages in project mode)
+    project_known=("CLAUDE.md")
+    for file in "${guideline_files[@]}"; do
+        project_known+=(".claude/${file}")
+    done
+    for skill in "${skill_dirs[@]}"; do
+        project_known+=(".claude/skills/${skill}/SKILL.md")
+    done
+
+    echo ""
+    apply_downloads "." "${project_files[@]}" -- "${project_known[@]}"
+    echo ""
 
     # Update .gitignore if it exists
     if [ -f ".gitignore" ]; then
-        if ! grep -q ".claude/settings.local.json" .gitignore; then
+        if ! grep -qF ".claude/settings.local.json" .gitignore; then
             echo -e "${YELLOW}Updating .gitignore...${NC}"
-            echo "" >> .gitignore
+            # Add blank line separator only if file doesn't end with one
+            [ -n "$(tail -c1 .gitignore)" ] && echo "" >> .gitignore
             echo "# Claude Code local settings" >> .gitignore
             echo ".claude/settings.local.json" >> .gitignore
             echo -e "${GREEN}Updated .gitignore${NC}"
