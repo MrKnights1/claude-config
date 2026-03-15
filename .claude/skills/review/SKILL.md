@@ -61,3 +61,4 @@ End with a single brutal one-line verdict on the overall quality.
 - DO NOT hold back — the whole point is to find what's wrong
 - If the code is actually good, say so — do not invent problems that don't exist
 - Every review is a FRESH review, not relying on previous reviews
+- NEVER skip or refuse a review — when this skill is invoked, ALWAYS execute the full process above. Do not suggest skipping, summarize prior reviews, or ask if the user wants something else instead
