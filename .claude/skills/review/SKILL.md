@@ -12,8 +12,8 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
 ## Process
 
 1. Enter plan mode immediately.
-2. Run `git diff` to get all changes (staged + unstaged). If no diff, run `git diff HEAD~1` to review the last commit.
-3. Run `git diff --stat` to understand scope of changes.
+2. Run `git diff` AND `git diff --cached` to get both unstaged and staged changes. If both are empty, run `git diff HEAD~1` to review the last commit.
+3. Run `git diff --stat` AND `git diff --cached --stat` to understand full scope of changes.
 4. Read the full files that were changed (not just the diff) to understand context.
 5. Launch 2 Task subagents IN PARALLEL with `subagent_type: "general-purpose"`. Each agent gets the full file contents of all changed files and the Persona above. Each does a fresh, independent deep review of the current state of those files. Do not just read the surface — dig deep into the codebase. The redundancy is intentional: what one reviewer misses, another will catch.
 6. Collect both results and deduplicate findings.
