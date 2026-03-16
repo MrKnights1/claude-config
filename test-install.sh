@@ -72,7 +72,7 @@ OUTPUT=$(HOME="$TEST_DIR/home" bash "$INSTALL_SCRIPT" < /dev/null 2>&1) || true
 
 assert_contains "$OUTPUT" "Non-interactive mode" "shows non-interactive warning"
 assert_contains "$OUTPUT" "Mode: " "echoes selected mode"
-assert_contains "$OUTPUT" "project" "defaults to project mode"
+assert_contains "$OUTPUT" "global" "defaults to global mode"
 
 # ============================================================
 echo -e "\n${YELLOW}2. Project install creates correct structure${NC}"
@@ -146,6 +146,24 @@ assert_file_exists "$TEST_DIR/home/.claude/skills/commit/SKILL.md" "global commi
 assert_file_exists "$TEST_DIR/home/.claude/skills/review/SKILL.md" "global review skill in skills/"
 
 # ============================================================
+echo -e "\n${YELLOW}6b. Global install with attribution creates settings.json${NC}"
+# ============================================================
+setup
+mkdir -p "$TEST_DIR/home/.claude"
+# Use CLAUDE_INSTALL_RESPONSES: "g" for mode, "y" for attribution, "y" for apply
+(cd "$TEST_DIR" && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="g,y,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null) || true
+
+assert_file_exists "$TEST_DIR/home/.claude/settings.json" "settings.json created"
+if [ -f "$TEST_DIR/home/.claude/settings.json" ]; then
+    SETTINGS=$(cat "$TEST_DIR/home/.claude/settings.json")
+    assert_contains "$SETTINGS" '"commit": ""' "attribution commit is empty"
+    assert_contains "$SETTINGS" '"pr": ""' "attribution pr is empty"
+else
+    fail "attribution commit is empty" "settings.json not found"
+    fail "attribution pr is empty" "settings.json not found"
+fi
+
+# ============================================================
 echo -e "\n${YELLOW}7. jq deep merge preserves existing keys${NC}"
 # ============================================================
 setup
@@ -161,8 +179,6 @@ assert_contains "$RESULT" '"FOO": "bar"' "deep merge preserves unrelated keys"
 echo -e "\n${YELLOW}8. Attribution success message only on actual success${NC}"
 # ============================================================
 setup
-# Read the install script and check that "Attribution disabled" is inside success branches
-SCRIPT_CONTENT=$(cat "$INSTALL_SCRIPT")
 
 # Count occurrences of the success message
 SUCCESS_COUNT=$(grep -c "Attribution disabled" "$INSTALL_SCRIPT")
@@ -197,10 +213,10 @@ assert_contains "$WGET_LINE" "--https-only" "wget enforces HTTPS"
 assert_contains "$WGET_LINE" "exit 1" "wget has exit on failure"
 
 # ============================================================
-echo -e "\n${YELLOW}12. Attribution defaults to non-destructive${NC}"
+echo -e "\n${YELLOW}12. Attribution defaults to disabled${NC}"
 # ============================================================
 ATTR_LINE=$(grep "Disable commit/PR attribution" "$INSTALL_SCRIPT")
-assert_contains "$ATTR_LINE" '"n"' "attribution defaults to n"
+assert_contains "$ATTR_LINE" '"y"' "attribution defaults to y (disabled)"
 
 # ============================================================
 echo -e "\n${YELLOW}13. README accuracy${NC}"

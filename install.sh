@@ -26,6 +26,10 @@ if [[ ! "$GITHUB_BRANCH" =~ $_valid_branch ]]; then
     echo "Error: GITHUB_BRANCH must contain only alphanumeric characters, dots, hyphens, underscores, and slashes." >&2
     exit 1
 fi
+if [[ "$GITHUB_BRANCH" == *".."* ]]; then
+    echo "Error: GITHUB_BRANCH must not contain '..' sequences." >&2
+    exit 1
+fi
 
 BASE_URL="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}"
 
@@ -63,7 +67,7 @@ ask() {
     if [ -n "${CLAUDE_INSTALL_RESPONSES:-}" ]; then
         local idx
         idx=$(cat "$_ASK_INDEX_FILE")
-        reply=$(printf '%s\n' "$CLAUDE_INSTALL_RESPONSES" | cut -d',' -f$((idx + 1)))
+        reply=$(printf '%s\n' "$CLAUDE_INSTALL_RESPONSES" | awk -F',' -v i=$((idx + 1)) '{print $i}')
         echo $((idx + 1)) > "$_ASK_INDEX_FILE"
         echo -e "${YELLOW}Auto-response '${reply:-$default}' for: ${prompt}${NC}" >&2
     elif (echo -n "" > /dev/tty) 2>/dev/null; then
@@ -83,16 +87,23 @@ download_file() {
 
     mkdir -p "$(dirname "$dest")"
     if command -v curl &> /dev/null; then
-        curl -fSL --proto =https --connect-timeout 10 --max-time 30 --max-filesize 1048576 "$url" -o "$dest" || { echo -e "${RED}Download failed: $url${NC}" >&2; exit 1; }
+        curl -fSL --proto =https --proto-redir =https --connect-timeout 10 --max-time 30 --max-filesize 1048576 "$url" -o "$dest" || { echo -e "${RED}Download failed: $url${NC}" >&2; exit 1; }
     elif command -v wget &> /dev/null; then
         wget -q --https-only --timeout=30 "$url" -O "$dest" || { echo -e "${RED}Download failed: $url${NC}" >&2; exit 1; }
+        local filesize
+        filesize=$(wc -c < "$dest")
+        if [ "$filesize" -gt 1048576 ]; then
+            echo -e "${RED}Downloaded file exceeds 1MB limit: $url${NC}" >&2
+            rm -f "$dest"
+            exit 1
+        fi
     else
         echo -e "${RED}Neither curl nor wget found. Please install one.${NC}" >&2
         exit 1
     fi
 
     # Reject HTML responses (error pages, captive portals)
-    if head -c 50 "$dest" | grep -qi '<\(!DOCTYPE\|html\)'; then
+    if head -c 100 "$dest" | grep -qiE '^\s*<(!DOCTYPE|html)'; then
         echo -e "${RED}Downloaded file appears to be HTML, not markdown: $url${NC}" >&2
         rm -f "$dest"
         exit 1
@@ -175,7 +186,8 @@ apply_downloads() {
     fi
 
     echo ""
-    CONFIRM=$(ask "Apply these changes? (y/n)" "y")
+    local CONFIRM
+    CONFIRM=$(ask "Apply these changes? (Y/n)" "y")
     case "$CONFIRM" in
         y|Y|yes) ;;
         *) echo -e "${RED}Installation cancelled.${NC}" >&2; exit 0 ;;
@@ -216,6 +228,7 @@ apply_downloads() {
     if [ ${#removed[@]} -gt 0 ]; then
         for file in "${removed[@]}"; do
             rm -f "$target_dir/$file"
+            rmdir "$(dirname "$target_dir/$file")" 2>/dev/null || true
         done
     fi
 
@@ -245,7 +258,7 @@ echo -e "${BLUE}CLAUDE.md Installer${NC}"
 echo -e "${BLUE}================================${NC}\n"
 
 # Ask: install mode
-INSTALL_MODE=$(ask "Install globally or for this project? (g/p)" "p")
+INSTALL_MODE=$(ask "Install globally or for this project? (G/p)" "g")
 case "$INSTALL_MODE" in
     g|G|global) INSTALL_MODE="global" ;;
     *) INSTALL_MODE="project" ;;
@@ -255,7 +268,7 @@ echo -e "Mode: ${GREEN}${INSTALL_MODE}${NC}\n"
 if [ "$INSTALL_MODE" = "global" ]; then
 
     # Ask: attribution
-    DISABLE_ATTR=$(ask "Disable commit/PR attribution? (y/n)" "n")
+    DISABLE_ATTR=$(ask "Disable commit/PR attribution? (Y/n)" "y")
 
 
     # Build file list for global install
@@ -283,14 +296,8 @@ if [ "$INSTALL_MODE" = "global" ]; then
         fi
     done
 
-    # Build known paths for removal detection (all paths this installer ever manages in global mode)
-    global_known=("CLAUDE.md")
-    for file in "${guideline_files[@]}"; do
-        global_known+=(".claude/${file}")
-    done
-    for skill in "${skill_dirs[@]}"; do
-        global_known+=("skills/${skill}/SKILL.md")
-    done
+    # Known paths for removal detection — add historical paths here if files are removed from global_files
+    global_known=("${global_files[@]}")
 
     echo ""
     apply_downloads "$GLOBAL_DIR" "${global_files[@]}" -- "${global_known[@]}"
@@ -344,8 +351,8 @@ else
     # Validate project root
     if [ ! -d ".git" ] && [ ! -f "package.json" ] && [ ! -f "composer.json" ] && [ ! -f "Cargo.toml" ] && [ ! -f "go.mod" ] && [ ! -f "requirements.txt" ]; then
         echo -e "${YELLOW}Warning: This doesn't look like a project root (no .git, package.json, etc.)${NC}" >&2
-        if (echo -n "" > /dev/tty) 2>/dev/null; then
-            CONFIRM=$(ask "Install here anyway? (y/n)" "y")
+        if [ -n "${CLAUDE_INSTALL_RESPONSES:-}" ] || (echo -n "" > /dev/tty) 2>/dev/null; then
+            CONFIRM=$(ask "Install here anyway? (Y/n)" "y")
             case "$CONFIRM" in
                 y|Y|yes) ;;
                 *) echo -e "${RED}Installation cancelled.${NC}" >&2; exit 0 ;;
@@ -369,14 +376,8 @@ else
         download_file "${BASE_URL}/${file}" "$TEMP_DIR/$file"
     done
 
-    # Build known paths for removal detection (all paths this installer ever manages in project mode)
-    project_known=("CLAUDE.md")
-    for file in "${guideline_files[@]}"; do
-        project_known+=(".claude/${file}")
-    done
-    for skill in "${skill_dirs[@]}"; do
-        project_known+=(".claude/skills/${skill}/SKILL.md")
-    done
+    # Known paths for removal detection — add historical paths here if files are removed from project_files
+    project_known=("${project_files[@]}")
 
     echo ""
     apply_downloads "." "${project_files[@]}" -- "${project_known[@]}"
