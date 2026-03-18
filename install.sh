@@ -228,7 +228,11 @@ apply_downloads() {
     if [ ${#removed[@]} -gt 0 ]; then
         for file in "${removed[@]}"; do
             rm -f "$target_dir/$file"
-            rmdir "$(dirname "$target_dir/$file")" 2>/dev/null || true
+            local parent
+            parent="$(dirname "$target_dir/$file")"
+            if [ "$parent" != "$target_dir" ]; then
+                rmdir -p "$parent" 2>/dev/null || true
+            fi
         done
     fi
 

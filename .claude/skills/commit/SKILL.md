@@ -25,15 +25,15 @@ Create a simple, descriptive commit on the current branch.
 ## Examples
 
 ```
-Add event history modal UI
+As a teacher I can see event history so that I can track changes
 ```
 
 ```
-Implement move tracking with from/to locations
+Fix: Return proper error message for unauthorized requests
 ```
 
 ```
-Fix styling on modal dialog
+Refactor: Extract payment processing to service
 ```
 
 Bad: `wip`, `fixed stuff`, `updates`

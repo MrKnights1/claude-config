@@ -203,14 +203,11 @@ This gives Claude complete context while keeping the main file scannable.
 To update CLAUDE.md in existing projects:
 
 ```bash
-# Backup your customizations
-cp CLAUDE.md CLAUDE.md.backup
-
-# Reinstall latest version
+# Reinstall latest version (the installer auto-backs up changed files)
 curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh | bash
 
-# Merge your customizations back
-# (especially the "Common Commands" section)
+# Re-apply your customizations if needed
+# (especially the "Common Commands" section in CLAUDE.md)
 ```
 
 ---
@@ -250,7 +247,7 @@ Free to use in all your projects. No attribution needed.
 - **Repository**: https://github.com/MrKnights1/claude-config
 - **Official Install**: `curl -fsSL https://raw.githubusercontent.com/MrKnights1/claude-config/main/install.sh | bash`
 - **Shortened Install** (alternative): https://bit.ly/47KeOMh
-- **Claude Code Docs**: https://docs.claude.com/en/docs/claude-code
+- **Claude Code Docs**: https://docs.anthropic.com/en/docs/claude-code
 
 ---
 

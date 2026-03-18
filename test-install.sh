@@ -10,10 +10,17 @@ TEST_DIR="/tmp/claude-install-tests"
 PASSED=0
 FAILED=0
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+if [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m'
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    NC=''
+fi
 
 setup() {
     rm -rf "$TEST_DIR"
@@ -78,7 +85,7 @@ assert_contains "$OUTPUT" "global" "defaults to global mode"
 echo -e "\n${YELLOW}2. Project install creates correct structure${NC}"
 # ============================================================
 setup
-(mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project" && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="p,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null)
+(mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project" && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="p,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null) || true
 
 assert_file_exists "$TEST_DIR/project/CLAUDE.md" "CLAUDE.md created"
 assert_file_exists "$TEST_DIR/project/.claude/security.md" "security.md created"
@@ -101,7 +108,7 @@ assert_file_not_empty "$TEST_DIR/project/.claude/security.md" "security.md is no
 echo -e "\n${YELLOW}3. Project install updates .gitignore${NC}"
 # ============================================================
 setup
-(mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project" && echo "node_modules/" > .gitignore && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="p,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null)
+(mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project" && echo "node_modules/" > .gitignore && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="p,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null) || true
 
 GITIGNORE=$(cat "$TEST_DIR/project/.gitignore")
 assert_contains "$GITIGNORE" ".claude/settings.local.json" ".gitignore updated with settings.local.json"
@@ -111,7 +118,7 @@ assert_contains "$GITIGNORE" "node_modules" ".gitignore preserves existing entri
 echo -e "\n${YELLOW}4. Project install skips .gitignore if already has entry${NC}"
 # ============================================================
 setup
-(mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project" && echo ".claude/settings.local.json" > .gitignore && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="p,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null)
+(mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project" && echo ".claude/settings.local.json" > .gitignore && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="p,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null) || true
 
 LINE_COUNT=$(grep -c "settings.local.json" "$TEST_DIR/project/.gitignore")
 if [ "$LINE_COUNT" -eq 1 ]; then
@@ -124,7 +131,7 @@ fi
 echo -e "\n${YELLOW}5. Project install skips .gitignore if none exists${NC}"
 # ============================================================
 setup
-(mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project" && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="p,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null)
+(mkdir -p "$TEST_DIR/project" && cd "$TEST_DIR/project" && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="p,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1 > /dev/null) || true
 
 if [ ! -f "$TEST_DIR/project/.gitignore" ]; then
     pass "no .gitignore created when none existed"
