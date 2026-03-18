@@ -103,8 +103,6 @@ For comprehensive guidelines on specific topics, see:
 - Create a todo list when entering plan mode to track tasks and progress
 
 ### Never
-- Commit directly to main
-- Include "Co-Authored-By: Claude" in commits
 - Store secrets in code
 - Modify database directly in production
 - Expose error details to users
