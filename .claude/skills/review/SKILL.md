@@ -30,7 +30,7 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
 ## Code Review
 
 **Scope:** list of changed files
-**Findings:** X critical, X major, X minor
+**Findings:** X critical, X major, X minor, X nits
 ```
 
 ### Findings
@@ -49,6 +49,7 @@ Severity levels:
 - `[CRITICAL]` — Will break in production or is a security hole
 - `[MAJOR]` — Significant design flaw or bug waiting to happen
 - `[MINOR]` — Code smell that will cause pain later
+- `[NIT]` — Style or naming preference, not worth blocking on
 
 ### Verdict
 
