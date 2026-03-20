@@ -173,6 +173,15 @@ else
 fi
 
 # ============================================================
+echo -e "\n${YELLOW}6c. Attribution skip when already disabled${NC}"
+# ============================================================
+setup
+mkdir -p "$TEST_DIR/home/.claude"
+printf '{"attribution":{"commit":"","pr":""}}\n' > "$TEST_DIR/home/.claude/settings.json"
+OUTPUT=$(cd "$TEST_DIR" && HOME="$TEST_DIR/home" CLAUDE_INSTALL_RESPONSES="g,y,y" bash "$INSTALL_SCRIPT" < /dev/null 2>&1) || true
+assert_contains "$OUTPUT" "already disabled" "skips write when attribution already empty"
+
+# ============================================================
 echo -e "\n${YELLOW}7. jq deep merge preserves existing keys${NC}"
 # ============================================================
 setup

@@ -314,15 +314,21 @@ if [ "$INSTALL_MODE" = "global" ]; then
             SETTINGS_FILE="$GLOBAL_DIR/settings.json"
             if [ -f "$SETTINGS_FILE" ]; then
                 if command -v jq &> /dev/null; then
-                    echo -e "${YELLOW}Updating settings.json...${NC}"
-                    if jq '.attribution.commit = "" | .attribution.pr = ""' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" 2>/dev/null \
-                       && [ -s "$SETTINGS_FILE.tmp" ] \
-                       && jq . "$SETTINGS_FILE.tmp" > /dev/null 2>&1; then
-                        mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
-                        echo -e "${GREEN}Attribution disabled in settings.json${NC}"
+                    if ! jq . "$SETTINGS_FILE" > /dev/null 2>&1; then
+                        echo -e "${RED}Error: settings.json is not valid JSON${NC}" >&2
+                    elif jq -e '.attribution.commit == "" and .attribution.pr == ""' "$SETTINGS_FILE" > /dev/null 2>&1; then
+                        echo -e "${GREEN}Attribution already disabled — skipping${NC}"
                     else
-                        rm -f "$SETTINGS_FILE.tmp"
-                        echo -e "${RED}Error: settings.json merge failed (is settings.json valid JSON?)${NC}" >&2
+                        echo -e "${YELLOW}Updating settings.json...${NC}"
+                        if jq '.attribution.commit = "" | .attribution.pr = ""' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" 2>/dev/null \
+                           && [ -s "$SETTINGS_FILE.tmp" ] \
+                           && jq . "$SETTINGS_FILE.tmp" > /dev/null 2>&1; then
+                            mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+                            echo -e "${GREEN}Attribution disabled in settings.json${NC}"
+                        else
+                            rm -f "$SETTINGS_FILE.tmp"
+                            echo -e "${RED}Error: settings.json merge failed (is settings.json valid JSON?)${NC}" >&2
+                        fi
                     fi
                 else
                     echo -e "${YELLOW}jq not found, skipping settings.json update. Install jq or add attribution manually.${NC}" >&2
