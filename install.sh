@@ -256,6 +256,7 @@ skill_dirs=(
     "merge"
     "issue"
     "review"
+    "plan"
 )
 
 echo -e "${BLUE}CLAUDE.md Installer${NC}"
@@ -345,7 +346,7 @@ if [ "$INSTALL_MODE" = "global" ]; then
 
     echo -e "${YELLOW}Next steps:${NC}"
     echo -e "  1. Start a new Claude Code session"
-    echo -e "  2. Skills (/commit, /merge, /issue, /review) are now available globally"
+    echo -e "  2. Skills (/commit, /merge, /issue, /review, /plan) are now available globally"
     echo -e "  3. Guidelines apply to all projects without a project-level CLAUDE.md\n"
 
     echo -e "${BLUE}Tip:${NC} Project-level CLAUDE.md files override the global one.\n"

@@ -100,6 +100,7 @@ assert_file_exists "$TEST_DIR/project/.claude/skills/commit/SKILL.md" "commit sk
 assert_file_exists "$TEST_DIR/project/.claude/skills/merge/SKILL.md" "merge skill created"
 assert_file_exists "$TEST_DIR/project/.claude/skills/issue/SKILL.md" "issue skill created"
 assert_file_exists "$TEST_DIR/project/.claude/skills/review/SKILL.md" "review skill created"
+assert_file_exists "$TEST_DIR/project/.claude/skills/plan/SKILL.md" "plan skill created"
 
 assert_file_not_empty "$TEST_DIR/project/CLAUDE.md" "CLAUDE.md is not empty"
 assert_file_not_empty "$TEST_DIR/project/.claude/security.md" "security.md is not empty"
@@ -151,6 +152,7 @@ assert_file_exists "$TEST_DIR/home/.claude/CLAUDE.md" "global CLAUDE.md created"
 assert_file_exists "$TEST_DIR/home/.claude/.claude/security.md" "global security.md in .claude/.claude/"
 assert_file_exists "$TEST_DIR/home/.claude/skills/commit/SKILL.md" "global commit skill in skills/"
 assert_file_exists "$TEST_DIR/home/.claude/skills/review/SKILL.md" "global review skill in skills/"
+assert_file_exists "$TEST_DIR/home/.claude/skills/plan/SKILL.md" "global plan skill in skills/"
 
 # ============================================================
 echo -e "\n${YELLOW}6b. Global install with attribution creates settings.json${NC}"

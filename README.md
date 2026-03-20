@@ -56,7 +56,8 @@ claude-config/
         ├── commit/SKILL.md   # /commit - create git commits
         ├── merge/SKILL.md    # /merge - squash merge to main
         ├── issue/SKILL.md    # /issue - create GitHub issues
-        └── review/SKILL.md   # /review - brutally honest code review
+        ├── review/SKILL.md   # /review - brutally honest code review
+        └── plan/SKILL.md     # /plan - plan feature implementation
 ```
 
 ## ✨ Features
@@ -79,6 +80,7 @@ claude-config/
 - `/merge` - Squash merge feature branches to main
 - `/issue` - Create GitHub issues (features & bugs)
 - `/review` - Brutally honest code review (2 parallel reviewers)
+- `/plan` - Plan feature implementation before coding
 
 ✅ **Production-Ready**
 - Used and tested in real projects
@@ -221,6 +223,7 @@ Skills are invoked with slash commands in Claude Code:
 /merge           # Squash merge to main
 /issue           # Create a GitHub issue
 /review          # Brutally honest code review
+/plan            # Plan feature implementation
 ```
 
 Skills provide structured workflows that Claude follows automatically.
