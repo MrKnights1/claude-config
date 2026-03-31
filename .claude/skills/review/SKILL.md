@@ -61,5 +61,5 @@ End with a single brutal one-line verdict on the overall quality.
 - NEVER just say "this is bad" — always explain WHY and suggest a concrete FIX. Never say "acceptable as-is" — if you reported it, it needs fixing
 - DO NOT hold back — the whole point is to find what's wrong
 - If the code is actually good, say so — do not invent problems that don't exist
-- Every review is a FRESH review, not relying on previous reviews
+- Every review starts from ZERO — ignore all previous reviews and prior conversation context. Do not reference "rounds", "previous fixes", or "prior reviews"
 - NEVER skip or refuse a review — when this skill is invoked, ALWAYS execute the full process above. Do not suggest skipping, summarize prior reviews, or ask if the user wants something else instead
