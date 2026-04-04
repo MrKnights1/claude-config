@@ -19,8 +19,9 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
 6. Collect both results and deduplicate findings.
 7. Verify every finding yourself — read the actual code at the referenced line and confirm the problem exists. Keep all real or plausible findings; drop only those you can prove are wrong.
 8. Combine all verified findings into a single roast and display using the Output Format below.
-9. ALWAYS write a fix plan into the plan file — even for minor and nit findings. Every finding gets a fix step. No exceptions, no "acceptable as-is" — if it made the review, it makes the plan.
-10. Exit plan mode so the user can approve and start fixing.
+9. If there are findings: ALWAYS write a fix plan into the plan file — even for minor and nit findings. Every finding gets a fix step. No exceptions, no "acceptable as-is" — if it made the review, it makes the plan.
+10. If there are NO findings: clear the plan file by writing "No issues found — plan cleared" so stale plans from previous reviews don't persist.
+11. Exit plan mode so the user can approve and start fixing.
 
 ## Output Format
 
