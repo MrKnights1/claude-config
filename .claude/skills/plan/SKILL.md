@@ -11,14 +11,18 @@ You are a senior developer with 20 years of experience. You've learned the hard 
 
 ## Process
 
-1. Enter plan mode immediately.
-2. **Deep exploration first, ask second** — don't just skim files. Trace the full flow: read the entry point, follow function calls, understand data flow end-to-end, check how errors are handled, look at tests for expected behavior. Understand WHY the code works the way it does, not just WHAT it does. THEN ask clarifying questions informed by what you found. Do not ask blind questions before exploring.
+1. Ensure plan mode is active. If already in plan mode, continue.
+2. **Deep exploration first, ask second**:
+   - Read the entry point and trace function calls end-to-end. Understand data flow, error handling, and what tests cover.
+   - Understand WHY the code works the way it does, not just WHAT it does.
+   - Ask clarifying questions ONLY after exploration — never blind questions.
 3. **Search for existing patterns** — find how similar things are done in this project. Match them exactly. Do not invent new patterns when existing ones work.
-4. **Consider approaches** — never go with the first idea. Identify at least 3 ways to implement the feature, weigh trade-offs (complexity, performance, maintainability, how well it fits existing patterns), and pick the best one. Document what was considered and why alternatives were rejected — this prevents revisiting the same decisions later.
-5. **Check scope** — if the task is bigger than it looks (touches many files, needs migrations, breaks existing behavior), flag it and suggest splitting into smaller steps.
-6. **Write the plan** into the plan file using the format below. Order implementation steps by dependency and risk — do the uncertain/risky parts first so you fail fast.
-7. **Create a todo list** from the plan steps to track progress during implementation.
-8. Exit plan mode for user approval before writing any code.
+4. **Consider approaches** — never rush to the first idea. If multiple viable approaches exist, weigh trade-offs (complexity, performance, maintainability, fit with existing patterns) and pick the best one — document what was considered and why alternatives were rejected. For tasks with one obvious approach, document why it's the right one and skip alternatives. Do NOT invent contrived alternatives just to fill the section.
+5. **Check scope** — if the task is bigger than it looks (touches many files, needs migrations, breaks existing behavior), flag it and suggest splitting into smaller steps. If the plan would need >15 implementation steps, stop and suggest splitting before writing it.
+6. **Verify file references** — for every path in "Files to Modify", confirm the file exists with `Read` or `Glob`. For "Files to Create", confirm the parent directory exists with `Bash test -d <parent>` (Glob can't reliably distinguish empty dirs from non-existent ones). Catches typos and hallucinated paths before they reach the user.
+7. **Write the plan** into the plan file using the format below.
+8. Exit plan mode for user approval. This ends the current turn — wait for the user.
+9. **On the next turn after the user approves the plan**: immediately use TaskCreate to create one task per implementation step from the approved plan, then start executing the first task. Do not wait for the user to say "go" — approval IS the go signal. Tasks must reflect the FINAL approved version, not a draft — never create tasks before the user has approved the plan.
 
 ## Plan Format
 
@@ -36,6 +40,9 @@ What we're building and why. One paragraph max.
 
 ## Files to Create
 - `path/to/new-file.ts` — [purpose] (or "None")
+
+## Open Questions
+- [Anything ambiguous that needs the user to decide before approval — or "None"]
 
 ## Approach
 Chosen approach and why. What alternatives were considered and why they were rejected.

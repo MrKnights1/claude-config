@@ -16,10 +16,11 @@ Squash merge completed feature branch to main with proper commit message.
 
 ## Rules
 
-- ALWAYS include `Closes #XX` on separate line when resolving issues
+- Include `Closes #XX` on separate line when an issue number was identified (merges are when issues actually close — intermediate commits omit this). If no issue is associated, omit it.
 - NEVER include "Co-Authored-By: Claude"
 - Use detailed commit body for complex changes
 - Do NOT push (user will push manually)
+- NEVER skip or shortcut — when invoked, always execute the full process above
 
 ## Examples
 
@@ -48,18 +49,24 @@ Closes #80
 
 ## Process
 
-1. Verify pre-merge checklist
-2. Run `git log main..HEAD` to see all branch commits
-3. Run `git diff main...HEAD` to see total changes
-4. Check staged files - unstage any files unrelated to this merge
-5. Checkout main: `git checkout main`
-6. Squash merge: `git merge --squash <branch-name>`
-7. Commit with HEREDOC:
-   ```bash
-   git commit -m "$(cat <<'EOF'
-   Commit message here.
+> NOTE: shell variables do not persist across separate Bash tool calls. Record the branch name and issue number from steps 1-2 in conversation/memory and substitute the literal values into later commands.
 
-   Closes #XX
-   EOF
-   )"
-   ```
+1. **Branch sanity check + capture**: run `git rev-parse --abbrev-ref HEAD`. **Record the branch name in conversation memory** — shell variables do not persist across Bash tool calls, so you must substitute the literal value into later commands. If the branch is `main` or `master`, abort — you cannot merge a branch into itself.
+2. **Find the issue number** (for `Closes #XX`): inspect the branch name from step 1 for a leading number (the `gh issue develop` convention is `<num>-description`), or check `git log main..HEAD` for issue references. If none found, ask the user.
+3. Verify pre-merge checklist
+4. Run `git log main..HEAD` to see all branch commits
+5. Run `git diff main...HEAD` to see total changes
+6. Checkout main: `git checkout main`
+7. Squash merge using the literal branch name from step 1: `git merge --squash <branch-name>`
+8. **Conflict check**: run `git status`. If any unmerged paths exist, roll back with `git reset --merge` (do NOT use `git merge --abort` — `--squash` does not create MERGE_HEAD) and report the conflicts to the user. Do not commit a broken state.
+9. **Draft the commit message** using the Commit Format table above.
+10. Commit with the HEREDOC below. Substitute `Commit message here.` with the drafted message from step 9. If an issue number was found in step 2, include `Closes #<num>` on its own line after a blank line. If no issue, omit the `Closes` line entirely. The HEREDOC terminator `EOF` MUST be at column 0:
+
+```bash
+git commit -m "$(cat <<'EOF'
+Commit message here.
+
+Closes #XX
+EOF
+)"
+```
