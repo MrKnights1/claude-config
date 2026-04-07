@@ -1,6 +1,6 @@
 ---
 name: review
-description: Brutally honest, evidence-based code review. Use when user says "review", "review my code", or "criticize my changes".
+description: Brutally honest, evidence-based code review. Writes a fix plan and auto-executes it on approval. Use when user says "review", "review my code", or "criticize my changes".
 ---
 
 Review code changes with a senior dev's skepticism — evidence-based, no invented issues.
@@ -40,7 +40,8 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
 9. Combine all verified findings into a single roast and display using the Output Format below.
 10. If there are verified findings: ALWAYS write a fix plan into the plan file — every verified finding from step 8 (critical, major, minor, AND nit) gets a required implementation step. No exceptions, no "acceptable as-is" — if it survived verification, it gets fixed.
 11. If there are NO findings: clear the plan file by writing "No issues found — plan cleared" so stale plans from previous reviews don't persist.
-12. Exit plan mode so the user can approve and start fixing.
+12. Exit plan mode for user approval. This ends the current turn — wait for the user.
+13. **On the next turn after the user approves the plan**: immediately use TaskCreate to create one task per fix step from the approved plan, then start executing the first task. Do not wait for the user to say "go" — approval IS the go signal. Tasks must reflect the FINAL approved version. If there were no findings, skip this step — nothing to fix.
 
 ## Output Format
 
