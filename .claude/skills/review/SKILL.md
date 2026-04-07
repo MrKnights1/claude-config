@@ -23,19 +23,21 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
    - 3d. Otherwise, fall back to the last commit: run `git diff HEAD~1 HEAD` (append `-- <path>` if a file scope was set) and announce the fallback to the user.
 4. Run `git diff --stat` AND `git diff --cached --stat` to understand full scope of changes.
 5. Read the full files that were changed (not just the diff) to understand context.
-6. Launch 2 specialized Agent subagents IN PARALLEL with `subagent_type: "general-purpose"`. Both get the full file contents of all changed files, the Persona above, and any focus-area scope from step 2. Give them DIFFERENT angles so they don't duplicate work:
-   - **Agent A — correctness lens** (focus areas):
-     - Bugs, broken commands, wrong assumptions
-     - Security holes, input validation, injection
-     - Edge cases, null/undefined paths, off-by-one
-     - Error handling and race conditions
-   - **Agent B — design lens** (focus areas):
-     - Architecture and separation of concerns
-     - Maintainability, naming, readability
-     - Code duplication and complexity
-     - API design and abstraction level
-   Both review the full diff but report findings only in their assigned area. Do not just read the surface — trace function calls, check related files. If the focus-area scope from step 2 is set (e.g. "security"), both agents focus there instead of using their default lens.
-7. Collect both results and deduplicate findings.
+6. Launch 2 Agent subagents with identical prompts:
+   - **Subagent spec**: `subagent_type: "general-purpose"`, `model: "sonnet"` — fast enough for parallel review work.
+   - **Parallelism**: BOTH Agent tool calls MUST be issued in the same assistant message as two tool_use blocks. Calling one, waiting, then calling the other runs them sequentially and wastes time.
+   - **Prompt contents**: include all of the following in each agent's prompt:
+     - Full file contents of all changed files
+     - All non-empty diffs from step 3, labelled "staged diff:" / "unstaged diff:" / "HEAD~1 diff:" as applicable
+     - The Persona section above
+     - The focus-area keyword from step 2 — only if one was set; omit when scope was a file path or empty (file-path scope is already applied via step 3a's `-- <path>` filter)
+   - **Review scope**: if a focus-area keyword was set in step 2, instruct BOTH agents to focus ONLY on that concern and ignore all other finding categories. Otherwise, instruct both to review EVERYTHING — correctness (bugs, security, edge cases, error handling, race conditions) AND design (architecture, maintainability, naming, duplication, API design).
+   - **Duplication is intentional**: two independent reviewers catching the same issues independently is a confidence signal, and either one catching something the other missed is bonus coverage. Do NOT split the work between them.
+   - **Depth**: tell both agents to trace function calls and check related files, not just read the surface.
+7. Collect both results, merge duplicates, and pass through solo findings:
+   - **Merge duplicates**: when both agents flag the same issue, merge into one finding — keep whichever description is more specific and whichever fix is more actionable (if equivalent, pick either). Two findings are "the same issue" when they reference the same file and overlapping lines AND describe the same root cause — wording differences don't matter; different root causes on the same line stay separate.
+   - **Tag**: append `(flagged by both agents)` to the merged finding's title (e.g. `### [MAJOR] Title (flagged by both agents)`) so the confidence signal survives into step 8 verification and the final output.
+   - **Solo findings**: issues flagged by only one agent pass through unchanged.
 8. Verify every finding yourself — read the actual code at the referenced line and confirm the problem exists. Keep only findings you can confirm against the code; drop anything you cannot verify.
 9. Combine all verified findings into a single roast and display using the Output Format below.
 10. If there are verified findings: ALWAYS write a fix plan into the plan file — every verified finding from step 8 (critical, major, minor, AND nit) gets a required implementation step. No exceptions, no "acceptable as-is" — if it survived verification, it gets fixed.
