@@ -78,7 +78,7 @@ Before keeping a finding, check whether the concern is already mitigated by:
    - On the base branch, review:
      - `git diff --cached` (label: `staged diff:`)
      - `git diff` (label: `unstaged diff:`)
-     - `git diff HEAD^..HEAD` (label: `HEAD^..HEAD diff:`)
+     - Only if BOTH staged and unstaged diffs are empty, fall back to `git diff HEAD^..HEAD` (label: `HEAD^..HEAD diff:`) so there is something to review. If staged or unstaged changes exist, do NOT include `HEAD^..HEAD` — the user's working changes are the review scope, not the last commit.
    - If `HEAD^..HEAD` is unavailable (detect by running `git rev-parse HEAD^ 2>/dev/null` — if non-zero, this is a single-commit repo with no parent), use `git show HEAD` (label: `HEAD diff:`)
    - If multiple recent commits plausibly belong to the same topic, prefer reviewing the full current topic rather than stopping
    - If a file scope was given in the argument-parsing step, apply `-- '<path>'` (single-quoted) to the diff commands. Do not apply `-- '<path>'` if the path failed the allowlist check in step 2 — this is a redundant safety check; the primary rejection is in step 2.
