@@ -226,7 +226,7 @@ Before keeping a finding, check whether the concern is already mitigated by:
     ## Edited files
     (populated by the execution step as files are edited)
     ```
-    The `Base branch:` line is mandatory; the name MUST have been validated in the base-branch-detection step (if validation failed, `main` is the fallback and the substitution is noted in the review header). `Re-validation total` starts at 0. The `Branch safety stopped: <timestamp>` line is absent on initial write; it is added only when branch safety stops execution (see step 17).
+    The `Base branch:` line is mandatory; the name MUST have been validated in the base-branch-detection step (if validation failed, `main` is the fallback and the substitution is noted in the review header). `Re-validation total` starts at 0.
 
 16. Exit plan mode for user approval. This ends the current turn — wait for the user.
 
@@ -236,12 +236,7 @@ Before keeping a finding, check whether the concern is already mitigated by:
     - Otherwise, use TaskCreate to create one task per unchecked item (`- [ ]`) from the approved plan, then start executing the first unchecked task. Do not wait for the user to say "go" — approval IS the go signal.
 
     **Execution rules** (all plan file Writes in this step are full-content Writes per the format in step 15):
-    - **Branch safety**:
-      - (a) Re-check the current branch with `git branch --show-current`. Strip leading/trailing whitespace.
-      - (b) If the output is empty, treat as detached HEAD — stop and ask the user to check out a named branch.
-      - (c) If the output matches the `Base branch:` from the plan file (after trimming both values) and `Branch safety stopped` is NOT yet present, set the `Branch safety stopped: <timestamp>` header line via a full-content Write, stop, and ask the user for a feature branch. Do not resume in the same turn.
-      - (d) **Termination condition:** if `Branch safety stopped` is already present AND the current branch still equals the base, surface a final message that execution is impossible without a feature branch and stop permanently.
-    - **Cross-turn resume**: on any subsequent turn, if the plan file does not exist or is unreadable, surface "Plan file not found — re-run the review to generate a new plan" and stop. Otherwise, if the plan file still contains unchecked task items (`- [ ]`) and the current branch is a valid feature branch (not empty, not equal to the base): first re-read and validate the `Base branch:` header — if missing, empty, or not a valid branch (`git rev-parse --verify` fails), re-run the base-branch-detection step and write the recovered name back to the plan file's `Base branch:` header via a full-content Write. Re-run the branch-safety check against the recovered base. Only after the safety check passes, if `Branch safety stopped` is present, remove it via a full-content Write. Then proceed from the first unchecked item. Do not re-run the review or re-verify findings that were already written.
+    - **Cross-turn resume**: on any subsequent turn, if the plan file does not exist or is unreadable, surface "Plan file not found — re-run the review to generate a new plan" and stop. Otherwise, if the plan file still contains unchecked task items (`- [ ]`), proceed from the first unchecked item. Do not re-run the review or re-verify findings that were already written.
     - **Task completion marking**: after each fix lands, update the corresponding `- [ ]` to `- [x]` in the plan file via a full-content Write.
     - **Execution**: work sequentially, read files before editing, apply the smallest correct fix, don't widen scope.
     - **Track edits**: after each fix lands, add any newly written or edited file to the `## Edited files` section of the plan file via the same full-content Write. Include files not in the original diff (collateral edits). The `## Edited files` section is the durable cross-turn source of truth — do not rely on working memory alone.
