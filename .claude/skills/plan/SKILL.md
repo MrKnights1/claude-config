@@ -11,7 +11,7 @@ You are a senior developer with 20 years of experience. You've learned the hard 
 
 ## Process
 
-1. Ensure plan mode is active. If already in plan mode, continue.
+1. Call `ToolSearch` with query `select:EnterPlanMode,ExitPlanMode` to load the schemas, then invoke `EnterPlanMode`. Skip if already in plan mode.
 2. **Deep exploration first, ask second**:
    - Read the entry point and trace function calls end-to-end. Understand data flow, error handling, and what tests cover.
    - Understand WHY the code works the way it does, not just WHAT it does.
@@ -21,7 +21,7 @@ You are a senior developer with 20 years of experience. You've learned the hard 
 5. **Check scope** — if the task is bigger than it looks (touches many files, needs migrations, breaks existing behavior), flag it and suggest splitting into smaller steps. If the plan would need >15 implementation steps, stop and suggest splitting before writing it.
 6. **Verify file references** — for every path in "Files to Modify", confirm the file exists with `Read` or `Glob`. For "Files to Create", confirm the parent directory exists with `Bash test -d <parent>` (Glob can't reliably distinguish empty dirs from non-existent ones). Catches typos and hallucinated paths before they reach the user.
 7. **Write the plan** into the plan file using the format below.
-8. Exit plan mode for user approval. This ends the current turn — wait for the user.
+8. Invoke `ExitPlanMode` for user approval. This ends the current turn — wait for the user.
 9. **On the next turn after the user approves the plan**: immediately use TaskCreate to create one task per implementation step from the approved plan, then start executing the first task. Do not wait for the user to say "go" — approval IS the go signal. Tasks must reflect the FINAL approved version, not a draft — never create tasks before the user has approved the plan.
 
 ## Plan Format
@@ -71,3 +71,4 @@ Chosen approach and why. What alternatives were considered and why they were rej
 - If the task touches protected areas (auth, DB schema, CI, dependencies), flag it explicitly in the plan
 - Keep it concise — one line per step, no essays. The plan is a map, not a novel.
 - NEVER skip or shortcut planning — when this skill is invoked, ALWAYS execute the full process above. Do not suggest jumping straight to code, even for "simple" tasks.
+- NEVER write the plan file until `EnterPlanMode` has been called. If its schema isn't loaded, load it via `ToolSearch` first.
