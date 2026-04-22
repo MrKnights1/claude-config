@@ -25,7 +25,7 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
 5. Read the full files that were changed (not just the diff) to understand context.
 6. Launch 2 Agent subagents with identical prompts:
    - **Subagent spec**: `subagent_type: "general-purpose"`, `model: "sonnet"` — fast enough for parallel review work.
-   - **Parallelism**: BOTH Agent tool calls MUST be issued in the same assistant message as two tool_use blocks. Calling one, waiting, then calling the other runs them sequentially and wastes time.
+   - **Parallelism**: ONE message, TWO `Agent` tool_use blocks. Before sending, count the `Agent` calls in your response — if fewer than 2, stop and add the missing one.
    - **Prompt contents**: include all of the following in each agent's prompt:
      - Full file contents of all changed files
      - All non-empty diffs from step 3, labelled "staged diff:" / "unstaged diff:" / "HEAD~1 diff:" as applicable
