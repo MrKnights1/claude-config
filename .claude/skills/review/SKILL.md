@@ -23,9 +23,9 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
    - 3d. Otherwise, fall back to the last commit: run `git diff HEAD~1 HEAD` (append `-- <path>` if a file scope was set) and announce the fallback to the user.
 4. Run `git diff --stat` AND `git diff --cached --stat` to understand full scope of changes.
 5. Read the full files that were changed (not just the diff) to understand context.
-6. Launch 2 Agent subagents with identical prompts:
+6. Dispatch two reviewers in parallel. Both receive the same prompt contents (for the duplication-confidence model used in step 7); only the Agent tool's `description` values differ. Emit both calls in a single response:
    - **Subagent spec**: `subagent_type: "general-purpose"`, `model: "sonnet"` — fast enough for parallel review work.
-   - **Parallelism**: ONE message, TWO `Agent` tool_use blocks. Before sending, count the `Agent` calls in your response — if fewer than 2, stop and add the missing one.
+   - **Parallelism**: emit both Agent calls in parallel — a single response containing two `Agent` tool_use blocks. Give the two calls distinct `description` values (e.g., `Review agent A` / `Review agent B`) so the dispatcher doesn't collapse them as redundant.
    - **Prompt contents**: include all of the following in each agent's prompt:
      - Full file contents of all changed files
      - All non-empty diffs from step 3, labelled "staged diff:" / "unstaged diff:" / "HEAD~1 diff:" as applicable
