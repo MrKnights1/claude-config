@@ -22,25 +22,24 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
    - 3c. If both are empty, check `git rev-parse HEAD~1 2>/dev/null`. If it fails (single-commit repo), report "no changes to review", invoke `ExitPlanMode`, then end the turn.
    - 3d. Otherwise, fall back to the last commit: run `git diff HEAD~1 HEAD` (append `-- <path>` if a file scope was set) and announce the fallback to the user.
 4. Run `git diff --stat` AND `git diff --cached --stat` to understand full scope of changes.
-5. Read the full files that were changed (not just the diff) to understand context.
+5. Read the diff carefully. File contents are fetched on demand during step 8 verification, not upfront — stay in the diff at this stage.
 6. Dispatch two reviewers in parallel. Both receive the same prompt contents (for the duplication-confidence model used in step 7); only the Agent tool's `description` values differ. Emit both calls in a single response:
    - **Subagent spec**: `subagent_type: "general-purpose"`, `model: "sonnet"` — fast enough for parallel review work.
    - **Parallelism**: emit both Agent calls in parallel — a single response containing two `Agent` tool_use blocks. Give the two calls distinct `description` values (e.g., `Review agent A` / `Review agent B`) so the dispatcher doesn't collapse them as redundant.
    - **Prompt contents**: include all of the following in each agent's prompt:
-     - Full file contents of all changed files
-     - All non-empty diffs from step 3, labelled "staged diff:" / "unstaged diff:" / "HEAD~1 diff:" as applicable
+     - All non-empty diffs from step 3, labelled "staged diff:" / "unstaged diff:" / "HEAD~1 diff:" as applicable (agents extract changed-file paths from the diff headers)
      - The Persona section above
      - The focus-area keyword from step 2 — only if one was set; omit when scope was a file path or empty (file-path scope is already applied via step 3a's `-- <path>` filter)
    - **Review scope**: if a focus-area keyword was set in step 2, instruct BOTH agents to focus ONLY on that concern and ignore all other finding categories. Otherwise, instruct both to review EVERYTHING — correctness (bugs, security, edge cases, error handling, race conditions) AND design (architecture, maintainability, naming, duplication, API design).
    - **Mitigation handling**: instruct agents to flag concerns even when they observe a possible mitigation — mitigation evaluation is the orchestrator's job at step 8. If an agent observes a potential mitigation, it notes it alongside the finding so the orchestrator can evaluate it.
    - **Duplication is intentional**: two independent reviewers catching the same issues independently is a confidence signal, and either one catching something the other missed is bonus coverage. Do NOT split the work between them.
-   - **Depth**: tell both agents to trace function calls and check related files, not just read the surface.
+   - **Scope and depth**: tell both agents the review target is the DIFF and its trace. For each change: (a) verify the change itself on its own; (b) `Grep` for callers/consumers/tests of changed symbols and `Read` them to catch breaks the change caused (trace forward); (c) `Read` any config, schema, or code the change implicitly depends on to verify its assumptions hold (trace backward). Fetch files only on demand, only the regions needed. Every finding must link causally to a change in the diff: either the change itself is wrong, OR the change caused or exposed a problem in traced code — traced code may be unchanged, that is IN scope. What's OUT of scope: pre-existing bugs in code the diff neither touched nor reached via the trace.
 7. Collect both results, merge duplicates, and pass through solo findings:
    - **Merge duplicates**: when both agents flag the same issue, merge into one finding — keep whichever description is more specific and whichever fix is more actionable (if equivalent, pick either). Two findings are "the same issue" when they reference the same file and overlapping lines AND describe the same root cause — wording differences don't matter; different root causes on the same line stay separate.
    - **Tag**: append `(flagged by both agents)` to the merged finding's title (e.g. `### [MAJOR] Title (flagged by both agents)`) so the confidence signal survives into step 8 verification and the final output.
    - **Solo findings**: issues flagged by only one agent pass through unchanged.
-8. Verify every finding yourself — read the actual code at the referenced line and confirm the problem exists. Then check whether the concern is already mitigated by: tests, type constraints, framework guarantees, validation layers, transaction boundaries, or a guard clause that makes the failing path unreachable at the call site. The mitigation must correctly and fully cover the specific failure path — an error-swallowing try/catch, a happy-path-only test, or a validation layer that doesn't catch this case does NOT count. Keep a finding only if (a) the problem exists at the referenced line AND (b) it is not already mitigated. Drop it if either condition fails.
-9. Combine all verified findings into a single structured review and display using the Output Format below. If any findings were dropped by the mitigation check in step 8, list them in the `Dropped (Already Mitigated)` section of the output with severity, title, and which mitigation applied.
+8. Verify every finding yourself — read the actual code at the referenced line and confirm the problem exists. Then check whether the concern is already mitigated. To drop a finding as mitigated, you MUST cite the exact file:line of the mitigation (the test that asserts THIS specific case, the type constraint at the call site, the validation layer that rejects THIS input, the transaction wrapping the code, the guard clause that makes the failing path unreachable). An inferred, plausible, or "surely the framework handles it" mitigation is NOT sufficient — if you cannot point to a specific line, the concern is NOT mitigated; keep the finding. Bias toward keeping: dropping is the exceptional case and requires a concrete citation. Error-swallowing try/catch, happy-path-only tests, and guards that don't cover the specific input do NOT count. Keep a finding when (a) the problem exists at the referenced line AND (b) you cannot cite a specific mitigating file:line. Drop it only when (a) holds and (b) is satisfied by a cited mitigation.
+9. Combine all verified findings into a single structured review and display using the Output Format below. If any findings were dropped by the mitigation check in step 8, list them in the `Dropped (Already Mitigated)` section with severity, title, AND the specific file:line cited as the mitigation (no citation → the drop is invalid, return it to findings).
 10. If there are verified findings: ALWAYS write a fix plan into the plan file — every verified finding from step 8 (critical, major, minor, AND nit) gets a required implementation step. No exceptions, no "acceptable as-is" — if it survived both the existence check and the mitigation check, it gets fixed. Findings dropped by the mitigation check do NOT enter the plan.
 11. If there are NO findings: clear the plan file by writing "No issues found — plan cleared" so stale plans from previous reviews don't persist.
 12. Invoke `ExitPlanMode` for user approval. This ends the current turn — wait for the user.
@@ -79,11 +78,11 @@ Severity levels (with concrete examples):
 
 ### Dropped (Already Mitigated)
 
-Render this section ONLY when one or more findings were dropped by the mitigation check in step 8. One line per dropped finding:
+Render this section ONLY when one or more findings were dropped by the mitigation check in step 8. One line per dropped finding, with a REQUIRED citation to the file:line that performs the mitigation:
 
-`- [SEVERITY] Title — mitigated by <mechanism>`
+`- [SEVERITY] Title — mitigated by <file:line> (<mechanism>)`
 
-Omit the entire section when nothing was dropped.
+If no file:line can be cited, the finding is NOT mitigated — return it to the Findings section. Omit this entire section when nothing was dropped.
 
 ### Verdict
 
