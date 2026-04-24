@@ -38,9 +38,32 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
    - **Merge duplicates**: when both agents flag the same issue, merge into one finding — keep whichever description is more specific and whichever fix is more actionable (if equivalent, pick either). Two findings are "the same issue" when they reference the same file and overlapping lines AND describe the same root cause — wording differences don't matter; different root causes on the same line stay separate.
    - **Tag**: append `(flagged by both agents)` to the merged finding's title (e.g. `### [MAJOR] Title (flagged by both agents)`) so the confidence signal survives into step 8 verification and the final output.
    - **Solo findings**: issues flagged by only one agent pass through unchanged.
-8. Verify every finding yourself — read the actual code at the referenced line and confirm the problem exists. Then check whether the concern is already mitigated. To drop a finding as mitigated, you MUST cite the exact file:line of the mitigation (the test that asserts THIS specific case, the type constraint at the call site, the validation layer that rejects THIS input, the transaction wrapping the code, the guard clause that makes the failing path unreachable). An inferred, plausible, or "surely the framework handles it" mitigation is NOT sufficient — if you cannot point to a specific line, the concern is NOT mitigated; keep the finding. Bias toward keeping: dropping is the exceptional case and requires a concrete citation. Error-swallowing try/catch, happy-path-only tests, and guards that don't cover the specific input do NOT count. Keep a finding when (a) the problem exists at the referenced line AND (b) you cannot cite a specific mitigating file:line. Drop it only when (a) holds and (b) is satisfied by a cited mitigation.
+8. Verify every finding yourself — read the referenced line and confirm the problem exists. If it doesn't, drop it.
+
+    Then check whether the concern is already mitigated. To drop a finding as mitigated, cite a specific `file:line` of the mitigation — one of:
+    - A test that asserts this exact case.
+    - A type constraint at the call site.
+    - A validation layer that rejects this exact input.
+    - A transaction wrapping the code.
+    - A guard clause that makes the failing path unreachable.
+
+    **Bias toward keeping.** Dropping is the exception — it requires a concrete citation. These do NOT count as mitigations:
+    - "The framework probably handles it" (no file:line).
+    - An error-swallowing try/catch.
+    - A happy-path-only test.
+    - A guard that doesn't cover the specific failing input.
+
+    Decision: keep the finding unless you can cite a mitigating `file:line`.
 9. Combine all verified findings into a single structured review and display using the Output Format below. If any findings were dropped by the mitigation check in step 8, list them in the `Dropped (Already Mitigated)` section with severity, title, AND the specific file:line cited as the mitigation (no citation → the drop is invalid, return it to findings).
-10. If there are verified findings: ALWAYS write a fix plan into the plan file — every verified finding from step 8 (critical, major, minor, AND nit) gets a required implementation step. No exceptions, no "acceptable as-is" — if it survived both the existence check and the mitigation check, it gets fixed. Findings dropped by the mitigation check do NOT enter the plan.
+10. If there are verified findings, write a fix plan into the plan file. Every verified finding (critical, major, minor, AND nit) gets its own implementation step — no exceptions. Findings dropped by the mitigation check do NOT enter the plan.
+
+    **For each step, sketch 2–3 candidate approaches and pick the one most likely to survive a second review round.** A round-2 reviewer looks at the fix itself, not the original finding — so the chosen fix should add as little new review surface as possible:
+    - Prefer a general formulation over a narrow special-case.
+    - Don't add parameters, defaults, or config no caller exercises.
+    - Reference shared values from their defining module instead of copying them inline.
+    - Don't emit logs, state, or side-effects that duplicate what surrounding code already produces.
+
+    Write only the chosen approach in the plan. If a rejected alternative was non-trivial, add a one-line `considered: X — rejected because Y` under the step.
 11. If there are NO findings: clear the plan file by writing "No issues found — plan cleared" so stale plans from previous reviews don't persist.
 12. Invoke `ExitPlanMode` for user approval. This ends the current turn — wait for the user.
 13. **On the next turn after the user approves the plan**: immediately use TaskCreate to create one task per fix step from the approved plan, then start executing the first task. Do not wait for the user to say "go" — approval IS the go signal. Tasks must reflect the FINAL approved version. If there were no findings, skip this step — nothing to fix.
