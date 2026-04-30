@@ -32,6 +32,7 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
      - The focus-area keyword from step 2 — only if one was set; omit when scope was a file path or empty (file-path scope is already applied via step 3a's `-- <path>` filter)
    - **Review scope**: if a focus-area keyword was set in step 2, instruct BOTH agents to focus ONLY on that concern and ignore all other finding categories. Otherwise, instruct both to review EVERYTHING — correctness (bugs, security, edge cases, error handling, race conditions) AND design (architecture, maintainability, naming, duplication, API design).
    - **Mitigation handling**: instruct agents to flag concerns even when they observe a possible mitigation — mitigation evaluation is the orchestrator's job at step 8. If an agent observes a potential mitigation, it notes it alongside the finding so the orchestrator can evaluate it.
+   - **Problem-vs-preference filter**: tell agents to flag only *problems*, not *preferences*. A problem names a concrete failure scenario, a documented project-convention violation, or a measurable downside (perf, security, correctness). A preference is "could be cleaner", "could be safer" (without a specific failure), or "I'd write it differently". Preferences oscillate between review rounds; problems don't. Same filter the orchestrator applies in step 8 — catching it at the source reduces noise.
    - **Duplication is intentional**: two independent reviewers catching the same issues independently is a confidence signal, and either one catching something the other missed is bonus coverage. Do NOT split the work between them.
    - **Scope and depth**: tell both agents the review target is the DIFF and its trace, scoped to what the diff is trying to accomplish. For each change: (a) verify the change itself on its own; (b) `Grep` for callers/consumers/tests of changed symbols and `Read` them to catch breaks the change caused (trace forward); (c) `Read` any config, schema, or code the change implicitly depends on to verify its assumptions hold (trace backward). Fetch files only on demand, only the regions needed. Every finding must link causally to a change in the diff: either the change itself is wrong, OR the change caused or exposed a problem in traced code — traced code may be unchanged, that is IN scope. What's OUT of scope: pre-existing bugs in code the diff neither touched nor reached via the trace; AND issues unrelated to what the diff is trying to do, even when observed while tracing. The review answers "did this change do what it set out to do, safely?" — not "is everything around it in good shape?"
 7. Collect both results, merge duplicates, and pass through solo findings:
@@ -39,6 +40,13 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
    - **Tag**: append `(flagged by both agents)` to the merged finding's title (e.g. `### [MAJOR] Title (flagged by both agents)`) so the confidence signal survives into step 8 verification and the final output.
    - **Solo findings**: issues flagged by only one agent pass through unchanged.
 8. Verify every finding yourself — read the referenced line and confirm the problem exists. If it doesn't, drop it.
+
+    **Problem-vs-preference filter.** For each finding, name what makes it a *problem*:
+    - A concrete failure scenario (e.g., "with input X, this returns Y instead of Z").
+    - A documented project convention violation (cite where the convention is documented).
+    - A measurable downside (performance, security CVE class, correctness gap).
+
+    If the best you can articulate is "could be cleaner", "could be safer" (without a specific failure), "I'd write it differently", or "better practice in general" — that's a *preference*, not a problem. **Drop it.** Preferences are exactly what oscillates between review rounds; if no concrete harm exists, the finding shouldn't have stood in the first place. Real bugs don't ping-pong.
 
     Then check whether the concern is already mitigated. To drop a finding as mitigated, cite a specific `file:line` of the mitigation — one of:
     - A type constraint at the call site.
@@ -53,7 +61,18 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
     - A guard that doesn't cover the specific failing input.
 
     Decision: keep the finding unless you can cite a mitigating `file:line`.
-9. Combine all verified findings into a single structured review and display using the Output Format below. If any findings were dropped by the mitigation check in step 8, list them in the `Dropped (Already Mitigated)` section with severity, title, AND the specific file:line cited as the mitigation (no citation → the drop is invalid, return it to findings).
+
+    **Oscillation check.** Look at:
+    1. **The current diff** (the review target itself — staged + unstaged from step 3). This is the primary signal: in a typical pre-commit workflow, prior fixes from earlier `/review` rounds live HERE as uncommitted changes, alongside the user's own changes. If a line is in the diff (as added or modified) AND your proposed fix would partially or fully reverse it, that's oscillation regardless of who put the line there.
+    2. **Recent commits** (`git log -p -3 <file>`). Secondary, only relevant when reviewing already-committed work or when a previous round's fix happens to have been committed between runs.
+
+    If either source shows the line was already changed AND your proposed fix would partially or fully reverse that change, oscillation is possible. Don't auto-drop and don't auto-apply — pause and pick deliberately:
+    - **Current state is correct, the prior change was the right call**: drop the finding as taste-not-bug.
+    - **Previous state was correct, the prior change was wrong**: keep the finding, and write the fix as a concrete revert — restore the affected lines to their prior form. Cite the diff hunk or commit being reverted (so the user can verify the choice), and step 13 will execute the revert like any other fix step.
+    - **Neither is correct**: keep the finding and propose a third form distinct from both.
+
+    The point is to break the ping-pong by *picking*, not by defaulting either way.
+9. Combine all verified findings into a single structured review and display using the Output Format below. If any findings were dropped by the mitigation check in step 8, list them in the `Dropped (Already Mitigated)` section with severity, title, AND the specific file:line cited as the mitigation (no citation → the drop is invalid, return it to findings). Oscillation-check drops are silent — no output.
 10. If there are verified findings, write a fix plan into the plan file. Every verified finding (critical, major, minor, AND nit) gets its own implementation step — no exceptions. Findings dropped by the mitigation check do NOT enter the plan.
 
     **For each step, sketch 2–3 candidate approaches and pick the one most likely to survive a second review round.** A round-2 reviewer looks at the fix itself, not the original finding — so the chosen fix should add as little new review surface as possible:
@@ -62,13 +81,14 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
     - Reference shared values from their defining module instead of copying them inline.
     - Don't emit logs, state, or side-effects that duplicate what surrounding code already produces.
     - Don't leave comments describing the old behavior — update or remove them when changing the code they describe.
+    - Don't pick a candidate that would revert a recent change to the same line — whether that change is in the current diff (uncommitted, from the user or a prior `/review` round) or in a recent commit. Ping-ponging a previous change is taste-not-bug; the finding itself probably shouldn't have stood. Exception: if step 8's oscillation check kept the finding because the prior change was wrong, write the revert exactly as directed there — step 10 does not block that case.
 
     Write only the chosen approach in the plan. If a rejected alternative was non-trivial, add a one-line `considered: X — rejected because Y` under the step.
 11. If there are NO findings: clear the plan file by writing "No issues found — plan cleared" so stale plans from previous reviews don't persist.
 12. Invoke `ExitPlanMode` for user approval. This ends the current turn — wait for the user.
 13. **On the next turn after the user approves the plan**: immediately use TaskCreate to create one task per fix step from the approved plan, then start executing the first task. Do not wait for the user to say "go" — approval IS the go signal. Tasks must reflect the FINAL approved version. If there were no findings, skip this step — nothing to fix.
 14. **Post-fix self-review.** After every fix from the plan is applied, run a single self-check pass on the changes you just made — the goal is to catch problems the fixes themselves introduced, before the user has to re-run `/review`. Inline (no new subagent), one pass only:
-    - Run `git diff` against the pre-fix state to see what you changed.
+    - Identify the fix delta from your own Edit/Write calls during step 13 (you know what you changed). `git diff` shows the full uncommitted state (user's diff + your fixes); use it for context but focus the check on lines your fixes added or modified.
     - Apply the same survival criteria from step 10 — did any fix introduce new review surface (narrowing, dead defaults, inline duplicates, redundant logging, stale comments)?
     - For every comment within or adjacent to a changed line, verify it still accurately describes the current code. Stale comments are findings.
     - For every changed symbol with cross-file consumers, re-check that the consumers remain correct.
