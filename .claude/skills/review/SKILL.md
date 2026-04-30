@@ -61,11 +61,23 @@ You are a senior developer with 20 years of experience. You've seen every anti-p
     - Don't add parameters, defaults, or config no caller exercises.
     - Reference shared values from their defining module instead of copying them inline.
     - Don't emit logs, state, or side-effects that duplicate what surrounding code already produces.
+    - Don't leave comments describing the old behavior — update or remove them when changing the code they describe.
 
     Write only the chosen approach in the plan. If a rejected alternative was non-trivial, add a one-line `considered: X — rejected because Y` under the step.
 11. If there are NO findings: clear the plan file by writing "No issues found — plan cleared" so stale plans from previous reviews don't persist.
 12. Invoke `ExitPlanMode` for user approval. This ends the current turn — wait for the user.
 13. **On the next turn after the user approves the plan**: immediately use TaskCreate to create one task per fix step from the approved plan, then start executing the first task. Do not wait for the user to say "go" — approval IS the go signal. Tasks must reflect the FINAL approved version. If there were no findings, skip this step — nothing to fix.
+14. **Post-fix self-review.** After every fix from the plan is applied, run a single self-check pass on the changes you just made — the goal is to catch problems the fixes themselves introduced, before the user has to re-run `/review`. Inline (no new subagent), one pass only:
+    - Run `git diff` against the pre-fix state to see what you changed.
+    - Apply the same survival criteria from step 10 — did any fix introduce new review surface (narrowing, dead defaults, inline duplicates, redundant logging, stale comments)?
+    - For every comment within or adjacent to a changed line, verify it still accurately describes the current code. Stale comments are findings.
+    - For every changed symbol with cross-file consumers, re-check that the consumers remain correct.
+
+    **Fix everything you find — but stay narrowly scoped.** Touch only what the specific finding requires. Don't refactor unrelated code "while you're there," don't change signatures that ripple out to many callers, don't introduce new abstractions that weren't already needed, don't widen the blast radius beyond the original fix's footprint.
+
+    If a finding can't be fixed without diverging into something that could break unrelated code, STOP and surface it to the user as `Post-fix findings (out of scope for auto-fix)` with severity and `file:line` references — let the user decide whether to take it on as a separate task.
+
+    Do NOT recurse — this is a single pass.
 
 ## Output Format
 
