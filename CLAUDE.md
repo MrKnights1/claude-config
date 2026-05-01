@@ -30,6 +30,18 @@ Most wrong answers come from reasoning off a mental model when the actual fact i
 
 ---
 
+## Completion Discipline
+
+Most "stopped early" failures come from declaring done before checking the work against the ask. The work isn't done when the edit lands — it's done when the ask is satisfied and you can show it. See the task through to a complete answer rather than stopping partway.
+
+- **Mark complete on actual execution, not intent.** Map every ask to evidence (file:line, command output, test result, observed behavior) and state what you verified. If you can't verify it, don't ship it.
+- **Don't assume the outcome of a tool call or edit.** Re-read the file you changed, run the build / typecheck / tests if applicable, check the actual output. The Edit succeeding is not the same as the change being correct.
+- **Verify behavior, not surface.** "Add tests" implies the tests pass. "Fix the bug" implies the cause is gone, not the symptom suppressed. "Refactor X" implies X still works after.
+- **Don't trade silently.** If you decided to skip, defer, or substitute part of the ask, say so directly and say why. When uncertain, leave it open and say so — under-reporting beats over-reporting.
+- **Surface ambiguity instead of guessing.** If the prompt is unclear about scope or shape, ask before shipping. A short prompt is not an excuse for a shallow read; multi-verb prompts are multi-ask prompts.
+
+---
+
 ## Detailed Guidelines (Imported)
 
 For comprehensive guidelines on specific topics, see:
