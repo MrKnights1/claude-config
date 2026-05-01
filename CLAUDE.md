@@ -39,6 +39,8 @@ Most "stopped early" failures come from declaring done before checking the work 
 - **Verify behavior, not surface.** "Add tests" implies the tests pass. "Fix the bug" implies the cause is gone, not the symptom suppressed. "Refactor X" implies X still works after.
 - **Don't trade silently.** If you decided to skip, defer, or substitute part of the ask, say so directly and say why. When uncertain, leave it open and say so — under-reporting beats over-reporting.
 - **Surface ambiguity instead of guessing.** If the prompt is unclear about scope or shape, ask before shipping. A short prompt is not an excuse for a shallow read; multi-verb prompts are multi-ask prompts.
+- **A check's result is not its coverage — state both in the same sentence as the verdict.** "Tests pass" is not verifiable; "47/47 tests across src/ and tests/ pass" is. "Grep found nothing" is not verifiable; "grep across src/, tests/, scripts/ returned 0" is. If the check covered less than the claim ("done", "fixed", "all X updated"), the claim is wrong — narrow the claim or widen the check. Sample-checking is fine during work, never as proof of completeness.
+- **When the check can be scripted, script it and let exit code be the evidence.** For sweeps, migrations, bulk transforms, renames, anonymization, codemods: write a verifier that fails loudly on any miss (grep that must return 0, script with non-zero exit, expected-vs-actual count) and run it. An eyeballed sample is not equivalent to a verifier that would catch one slipped case in a hundred.
 
 ---
 
