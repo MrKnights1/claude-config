@@ -44,6 +44,18 @@ Most "stopped early" failures come from declaring done before checking the work 
 
 ---
 
+## Testing Discipline
+
+Every code change — new feature, bug fix, refactor — must be covered by tests that exercise the real code path before the change is considered done. Untested code is unfinished code.
+
+- **New code requires new tests.** Don't ship a function, endpoint, or component without at least one test for its main behavior and one for a meaningful failure mode.
+- **Changed code requires updated or added tests.** When modifying existing code, update existing tests to reflect the new behavior, or add a regression test that would have caught the bug being fixed. A fix without a regression test is incomplete.
+- **Test the real code, not a mock of it.** Mock external boundaries only (network, DB, clock, filesystem, third-party APIs). NEVER mock the function, class, or module under test — a test that mocks its target proves nothing. The test must import the real module from the source tree, not a redefined copy.
+- **Run the suite, don't assume.** "I added the test" is not the same as "the test passes." Run the relevant tests (and the full suite when scope allows) and report the actual result, including count (e.g., "47/47 passed").
+- **No testing setup yet?** Stop and set it up properly before writing the first test — see `.claude/testing.md` § First-time Setup. Ad-hoc test scripts rot; a real harness wired into CI does not.
+
+---
+
 ## Detailed Guidelines (Imported)
 
 For comprehensive guidelines on specific topics, see:

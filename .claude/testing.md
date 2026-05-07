@@ -1,5 +1,35 @@
 # Testing Requirements
 
+## First-time Setup
+
+If the project has no testing harness yet, do not write ad-hoc test scripts — set up a real framework first. Once committed, every future change has somewhere to land its tests, CI catches regressions automatically, and contributors discover how to run tests through one canonical command.
+
+The setup is the same five steps regardless of stack:
+
+1. **Pick the standard framework for the stack.** Don't invent — use what the ecosystem expects (the built-in test runner if there is one, otherwise the dominant community framework).
+
+2. **Add a top-level `test` script.** Wire it into the project manifest so a single canonical command runs the suite — `bun test`, `npm test`, `make test`, `composer test`, `pytest`, etc. CI, contributors, and editors all discover tests through this one entry point.
+
+3. **Create the directory layout and commit a green example test.** Pick the project's convention (co-located `*.test.ts` next to source, OR `tests/` mirroring `src/`) and commit ONE minimal passing test that imports a real module from the codebase. This proves the harness can find, compile, and run code from the project — not just a hello-world in isolation.
+
+4. **Offer to set up Husky for pre-push test enforcement.** Don't auto-install — ask the user first whether they want Git hooks via Husky so the test suite runs before every push (and optionally on `pre-commit` for fast checks like lint/typecheck). A failing test blocks the push locally, which is faster feedback than waiting for CI and prevents red commits from ever reaching the remote. On approval: `bun add -D husky` (or `npm install -D husky`), run `bunx husky init`, then write the test command into `.husky/pre-push`. (JS/TS ecosystem only — for Python/Go/Rust/PHP, offer the equivalent native Git hook or a tool like `pre-commit`.) Pair with a CI job later if the project has one.
+
+5. **Document the test command in `README.md`** under "Available Scripts" so new contributors find it immediately, and update `.env.example` if tests need any test-only environment variables.
+
+Only after these five steps are committed do you write the test for the change you originally came here to make.
+
+### What "real" testing means
+
+Tests must exercise the actual code under test, not a mock of it. The thing you're testing is the *target*; the things around it (network, DB, clock, filesystem, third-party APIs) are *boundaries* and may be mocked. Mocking the target makes the test prove nothing — it tests the mock.
+
+Concrete checks:
+- The test imports the real module/function/class from the source tree (not a redefined copy in the test file).
+- Mocks replace I/O and external services, not the unit's internal logic.
+- If you have to mock most of the target's collaborators to make the test work, that's a signal the unit is too coupled — fix the design, not the test.
+- Integration tests use a real (test) database, not a stubbed query layer.
+
+---
+
 ## Test Coverage
 
 - Write tests for all business logic and critical paths
