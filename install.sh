@@ -249,6 +249,7 @@ guideline_files=(
     "database.md"
     "standards.md"
     "project-init.md"
+    "playwright.md"
 )
 
 skill_dirs=(

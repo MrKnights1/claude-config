@@ -1,6 +1,6 @@
 # Browser Verification with Playwright MCP
 
-When work involves a browser-rendered surface, drive a real browser via Playwright MCP and verify behavior. Type checks and tests verify code correctness; they do not verify what a user actually sees, and reasoning about a rendered page without opening it is guessing.
+When work involves a browser-rendered surface — UI/frontend changes, web flow verification, backend changes a browser actually hits, or finding context from JavaScript-heavy sites — default to Playwright MCP (`mcp__playwright__browser_*` tools) rather than reasoning from code alone. Type checks and tests verify code correctness; they do not verify what a user actually sees, and reasoning about a rendered page without opening it is guessing.
 
 ## Use cases
 

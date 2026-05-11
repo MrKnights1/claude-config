@@ -56,14 +56,6 @@ Every code change — new feature, bug fix, refactor — must be covered by test
 
 ---
 
-## Browser Verification with Playwright MCP
-
-When work involves a browser-rendered surface — UI/frontend changes, web flow verification, backend changes a browser actually hits, or finding context from JavaScript-heavy sites — default to Playwright MCP (`mcp__playwright__browser_*` tools) rather than reasoning from code alone. Type checks and tests verify code correctness; they do not verify what a user actually sees.
-
-**Before executing any browser tool, `Read` `.claude/playwright.md` first.** Hard rule — the procedure lives there, not here.
-
----
-
 ## Detailed Guidelines (Imported)
 
 For comprehensive guidelines on specific topics, see:
@@ -76,6 +68,9 @@ For comprehensive guidelines on specific topics, see:
 
 ### Testing
 @.claude/testing.md
+
+### Browser Verification
+@.claude/playwright.md
 
 ### API Design & Logging
 @.claude/api-design.md
