@@ -277,6 +277,9 @@ if [ "$INSTALL_MODE" = "global" ]; then
     # Ask: attribution
     DISABLE_ATTR=$(ask "Disable commit/PR attribution? (Y/n)" "y")
 
+    # Ask: auto-compact threshold
+    SET_AUTOCOMPACT=$(ask "Set Claude Code auto-compact threshold to 70%? (Y/n)" "y")
+
 
     # Build file list for global install
     global_files=("CLAUDE.md")
@@ -343,6 +346,39 @@ if [ "$INSTALL_MODE" = "global" ]; then
             ;;
     esac
 
+    # Set auto-compact threshold to 70% if requested
+    case "$SET_AUTOCOMPACT" in
+        y|Y|yes)
+            SETTINGS_FILE="$GLOBAL_DIR/settings.json"
+            if [ -f "$SETTINGS_FILE" ]; then
+                if command -v jq &> /dev/null; then
+                    if ! jq . "$SETTINGS_FILE" > /dev/null 2>&1; then
+                        echo -e "${RED}Error: settings.json is not valid JSON${NC}" >&2
+                    elif jq -e '.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE == "70"' "$SETTINGS_FILE" > /dev/null 2>&1; then
+                        echo -e "${GREEN}Auto-compact threshold already 70% — skipping${NC}"
+                    else
+                        echo -e "${YELLOW}Updating settings.json...${NC}"
+                        if jq '.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE = "70"' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" 2>/dev/null \
+                           && [ -s "$SETTINGS_FILE.tmp" ] \
+                           && jq . "$SETTINGS_FILE.tmp" > /dev/null 2>&1; then
+                            mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+                            echo -e "${GREEN}Auto-compact threshold set to 70% in settings.json${NC}"
+                        else
+                            rm -f "$SETTINGS_FILE.tmp"
+                            echo -e "${RED}Error: settings.json merge failed (is settings.json valid JSON?)${NC}" >&2
+                        fi
+                    fi
+                else
+                    echo -e "${YELLOW}jq not found, skipping settings.json env update. Install jq or set CLAUDE_AUTOCOMPACT_PCT_OVERRIDE manually.${NC}" >&2
+                fi
+            else
+                echo -e "${YELLOW}Creating settings.json...${NC}"
+                printf '{\n  "env": {\n    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "70"\n  }\n}\n' > "$SETTINGS_FILE"
+                echo -e "${GREEN}Auto-compact threshold set to 70% in settings.json${NC}"
+            fi
+            ;;
+    esac
+
     echo -e "\n${BLUE}================================${NC}"
     echo -e "${GREEN}Global installation complete!${NC}"
     echo -e "${BLUE}================================${NC}\n"
@@ -350,7 +386,8 @@ if [ "$INSTALL_MODE" = "global" ]; then
     echo -e "${YELLOW}Installed to:${NC}"
     echo -e "  ~/.claude/CLAUDE.md"
     echo -e "  ~/.claude/.claude/*.md  (guidelines)"
-    echo -e "  ~/.claude/skills/*/     (skills)\n"
+    echo -e "  ~/.claude/skills/*/     (skills)"
+    echo -e "  ~/.claude/settings.json (env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE = \"70\")\n"
 
     echo -e "${YELLOW}Next steps:${NC}"
     echo -e "  1. Start a new Claude Code session"
