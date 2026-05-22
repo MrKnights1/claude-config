@@ -2,351 +2,239 @@
 
 ## First-time Setup
 
-If the project has no testing harness yet, do not write ad-hoc test scripts — set up a real framework first. Once committed, every future change has somewhere to land its tests, CI catches regressions automatically, and contributors discover how to run tests through one canonical command.
+If the project has no testing harness yet, do not write ad-hoc test scripts — set up a real framework first. Once committed, every future change has somewhere to land its tests and CI catches regressions automatically.
 
-The setup is the same five steps regardless of stack:
+1. **Pick the standard framework for the stack.** Use the built-in test runner if one exists; otherwise use the dominant community framework. Do not invent.
+2. **Add a top-level `test` command** wired into the project manifest so a single canonical command runs the suite.
+3. **Create the directory layout and commit one green example test** that imports a real module from the source tree. This proves the harness can find, compile, and run code from the project — not just a hello-world in isolation.
+4. **Offer (do not auto-install) a pre-push test hook.** A failing test should block the push locally rather than waiting for CI. Ask first; install only on approval.
+5. **Document the test command in `README.md`** and add any test-only environment variables to `.env.example`.
 
-1. **Pick the standard framework for the stack.** Don't invent — use what the ecosystem expects (the built-in test runner if there is one, otherwise the dominant community framework).
-
-2. **Add a top-level `test` script.** Wire it into the project manifest so a single canonical command runs the suite — `bun test`, `npm test`, `make test`, `composer test`, `pytest`, etc. CI, contributors, and editors all discover tests through this one entry point.
-
-3. **Create the directory layout and commit a green example test.** Pick the project's convention (co-located `*.test.ts` next to source, OR `tests/` mirroring `src/`) and commit ONE minimal passing test that imports a real module from the codebase. This proves the harness can find, compile, and run code from the project — not just a hello-world in isolation.
-
-4. **Offer to set up Husky for pre-push test enforcement.** Don't auto-install — ask the user first whether they want Git hooks via Husky so the test suite runs before every push (and optionally on `pre-commit` for fast checks like lint/typecheck). A failing test blocks the push locally, which is faster feedback than waiting for CI and prevents red commits from ever reaching the remote. On approval: `bun add -D husky` (or `npm install -D husky`), run `bunx husky init`, then write the test command into `.husky/pre-push`. (JS/TS ecosystem only — for Python/Go/Rust/PHP, offer the equivalent native Git hook or a tool like `pre-commit`.) Pair with a CI job later if the project has one.
-
-5. **Document the test command in `README.md`** under "Available Scripts" so new contributors find it immediately, and update `.env.example` if tests need any test-only environment variables.
-
-Only after these five steps are committed do you write the test for the change you originally came here to make.
-
-### What "real" testing means
-
-Tests must exercise the actual code under test, not a mock of it. The thing you're testing is the *target*; the things around it (network, DB, clock, filesystem, third-party APIs) are *boundaries* and may be mocked. Mocking the target makes the test prove nothing — it tests the mock.
-
-Concrete checks:
-- The test imports the real module/function/class from the source tree (not a redefined copy in the test file).
-- Mocks replace I/O and external services, not the unit's internal logic.
-- If you have to mock most of the target's collaborators to make the test work, that's a signal the unit is too coupled — fix the design, not the test.
-- Integration tests use a real (test) database, not a stubbed query layer.
+Only after these five steps are committed does the test for the original change get written.
 
 ---
 
-## Test Coverage
+## FIRST Principles
 
-- Write tests for all business logic and critical paths
-- Minimum test coverage: 80% for critical modules, 60% overall
-- Test file naming: `*.test.ts`, `*.spec.ts`, or `*.test.js`
-- Include unit, integration, and E2E tests as appropriate
+Every unit test satisfies all five:
 
----
-
-## Test Organization
-
-### File Structure
-```
-src/
-├── components/
-│   ├── Button.tsx
-│   └── Button.test.tsx       # Co-located unit test
-├── services/
-│   ├── auth.ts
-│   └── auth.test.ts
-tests/
-├── integration/              # Integration tests
-│   ├── api/
-│   │   └── users.test.ts
-│   └── database/
-│       └── migrations.test.ts
-├── e2e/                      # End-to-end tests
-│   ├── auth.e2e.ts
-│   └── checkout.e2e.ts
-├── fixtures/                 # Shared test data
-│   ├── users.json
-│   └── products.json
-└── helpers/                  # Test utilities
-    ├── setup.ts
-    └── factories.ts
-```
-
-### Naming Conventions
-- Describe what is being tested: `should return user when valid ID provided`
-- Group related tests with `describe` blocks
-- Use consistent patterns: `[unit]`, `[integration]`, `[e2e]` prefixes if needed
+| Principle | Meaning |
+|-----------|---------|
+| **Fast** | Runs in milliseconds. Slow tests get run less and trusted less. |
+| **Independent** | No ordering, no shared state with other tests. Any subset must pass in any order. |
+| **Repeatable** | Same input, same result, every environment, every run. No randomness, no clock, no network. |
+| **Self-validating** | Pass/fail is automatic. No logs to read, no images to eyeball. |
+| **Timely** | Written alongside the production code, not weeks later. |
 
 ---
 
-## Unit Tests
+## Test What the Code Does, Not How It Does It
 
-- Test individual functions in isolation
-- Mock external dependencies (API calls, database, file system)
-- Test edge cases: empty arrays, null values, boundary conditions
-- Test error handling: invalid inputs, exceptions
-- Keep tests fast: < 100ms per test
-- One logical assertion per test (related assertions OK)
+Assert on outputs, side effects, and externally observable state — never on internal calls, private fields, or implementation structure.
 
-### What to Unit Test
-- Pure functions and utilities
-- Business logic and calculations
-- Data transformations
-- Validation functions
-- State management reducers/actions
+| Bad | Good |
+|-----|------|
+| Assert that `formatPrice` called `Math.round` | Assert that `formatPrice(1.235)` returns `"1.24"` |
+| Spy on the internal cache to confirm a hit | Assert the second call returns the same value without re-querying |
+| Read a private field after the action | Assert on the public method whose contract depends on that field |
 
-### What NOT to Unit Test
-- Framework internals (React, Express, etc.)
-- Third-party library behavior
-- Simple getters/setters with no logic
-- Configuration files
+A test that breaks during a pure refactor is testing implementation. A test that survives a pure refactor and fails only when behavior changes is testing behavior.
 
 ---
 
-## Integration Tests
+## AAA Structure
 
-- Test API endpoints end-to-end
-- Use test database (NEVER production or development)
-- Test authentication and authorization flows
-- Test database transactions and rollbacks
-- Clean up test data after each test
-- Test external service integrations with mocks/stubs
+Every test has three phases, visually separated:
 
-### API Integration Test Pattern
-```typescript
-describe('POST /api/users', () => {
-  beforeEach(async () => {
-    await db.clean();
-    await db.seed();
-  });
+1. **Arrange** — set up inputs, fixtures, and collaborators
+2. **Act** — invoke the single behavior under test
+3. **Assert** — verify the outcome
 
-  it('creates user with valid data', async () => {
-    const response = await request(app)
-      .post('/api/users')
-      .send({ email: 'test@example.com', password: 'secure123' });
-
-    expect(response.status).toBe(201);
-    expect(response.body.data.email).toBe('test@example.com');
-  });
-
-  it('returns 400 for invalid email', async () => {
-    const response = await request(app)
-      .post('/api/users')
-      .send({ email: 'invalid', password: 'secure123' });
-
-    expect(response.status).toBe(400);
-    expect(response.body.error.code).toBe('VALIDATION_ERROR');
-  });
-});
-```
+One Act per test. Multiple Acts hide which step failed and what the test actually proves.
 
 ---
 
-## End-to-End (E2E) Tests
+## Test Naming
 
-- Test critical user flows (login, checkout, signup)
-- Run against staging environment or local with seeded data
-- Keep E2E tests minimal and focused on happy paths
-- Use page object pattern for maintainability
-- Run E2E tests in CI before deployment
+Test names describe the scenario and the expected outcome, not the method called.
 
-### Critical Flows to Test
-- User registration and login
-- Password reset flow
-- Main business workflows (checkout, booking, etc.)
-- Permission-based access (admin vs user)
+| Bad | Good |
+|-----|------|
+| `test_login` | `login_with_invalid_password_returns_401` |
+| `test_calculate` | `calculateTotal_returns_zero_for_empty_cart` |
+| `it works` | `rejects_negative_quantities_with_validation_error` |
+
+Either `methodName_doesX_whenY` or `given_X_when_Y_then_Z` is acceptable. Pick one per project and stay consistent.
 
 ---
 
-## Mocking Best Practices
+## Test Shape
 
-### When to Mock
-- External APIs and services
-- Database calls in unit tests
-- Time-dependent functions (`Date.now()`, timers)
-- File system operations
-- Environment variables
+The default distribution is roughly 70% unit, 20% integration, 10% end-to-end — many cheap fast tests, fewer slow expensive ones. Other shapes (testing trophy, honeycomb) are valid for projects dominated by integration concerns (microservices, UI-heavy apps), but the principle holds: catch each bug at the cheapest layer that can catch it.
 
-### When NOT to Mock
-- The code under test
-- Simple data transformations
-- Integration test dependencies (use real DB)
-
-### Mock Patterns (Jest)
-```typescript
-jest.mock('../services/emailService', () => ({
-  sendEmail: jest.fn().mockResolvedValue({ success: true })
-}));
-jest.useFakeTimers();
-jest.setSystemTime(new Date('2025-01-01'));
-process.env.API_KEY = 'test-key';
-```
-
-### Mock Patterns (Vitest / bun test)
-```typescript
-import { vi } from 'vitest';
-vi.mock('../services/emailService', () => ({
-  sendEmail: vi.fn().mockResolvedValue({ success: true })
-}));
-vi.useFakeTimers();
-vi.setSystemTime(new Date('2025-01-01'));
-process.env.API_KEY = 'test-key';
-```
+| Layer | Answers | Speed | Quantity |
+|-------|---------|-------|----------|
+| Unit | "does this function do what is expected?" | ms | many |
+| Integration | "do these components work together?" | 10s–100s of ms | fewer |
+| End-to-end | "does this user flow actually work?" | seconds | fewest |
 
 ---
 
-## Test Fixtures & Factories
+## What to Test, What to Skip
 
-### Fixtures (Static Test Data)
-```typescript
-// tests/fixtures/users.ts
-export const validUser = {
-  email: 'test@example.com',
-  name: 'Test User',
-  role: 'user'
-};
+Test:
+- Pure functions, business logic, calculations, data transformations
+- Validation, parsing, encoding/decoding
+- State transitions and reducers
+- Error paths and edge cases (empty, null, boundary, malformed, oversized)
+- Public APIs and contracts
 
-export const adminUser = {
-  email: 'admin@example.com',
-  name: 'Admin User',
-  role: 'admin'
-};
-```
-
-### Factories (Dynamic Test Data)
-```typescript
-// tests/helpers/factories.ts
-export function createUser(overrides = {}) {
-  return {
-    id: faker.string.uuid(),
-    email: faker.internet.email(),
-    name: faker.person.fullName(),
-    createdAt: new Date(),
-    ...overrides
-  };
-}
-
-// Usage
-const user = createUser({ role: 'admin' });
-```
+Skip:
+- Framework internals — already tested upstream
+- Third-party library behavior — not the code under test
+- Trivial getters/setters with no logic
+- Generated code and pure configuration
 
 ---
 
-## Test Database Management
+## Real Code, Mocked Boundaries
 
-- Use separate database for tests (e.g., `app_test`)
-- Reset database before each test suite
-- Use transactions for test isolation when possible
-- Seed minimal required data per test
+Tests must exercise the actual code under test. The thing being tested is the *target*; the things around it (network, DB, clock, filesystem, third-party APIs) are *boundaries* and may be replaced with test doubles.
 
-### Database Test Setup
-```typescript
-// tests/helpers/setup.ts
-beforeAll(async () => {
-  await db.migrate.latest();
-});
+| Rule | Reason |
+|------|--------|
+| Import the real target from the source tree | A redefined copy in the test file proves nothing |
+| Mock boundaries, not the target | Mocking the target tests the mock |
+| Do not mock what is not owned | Wrap third-party APIs in an internal adapter, then mock the adapter |
+| Mocking most of the target's collaborators is a design smell | Fix the coupling, do not paper over it with mocks |
 
-beforeEach(async () => {
-  await db.seed.run();
-});
+### Test Doubles — Pick the Weakest One That Works
 
-afterEach(async () => {
-  await db.clean();
-});
+| Double | Use when |
+|--------|----------|
+| **Stub** | The test needs canned return values from a collaborator; state verification |
+| **Fake** | A working in-memory substitute (in-memory DB, in-memory queue) is cheaper than the real thing |
+| **Spy** | The test needs to verify a call happened without changing the return |
+| **Mock** | The test must assert on interactions (behavior verification) |
+| **Dummy** | A parameter is required but never used |
 
-afterAll(async () => {
-  await db.destroy();
-});
-```
+Prefer stubs and fakes over mocks. Mocks couple tests to call patterns and break under refactors.
 
 ---
 
-## CI/CD Integration
+## Determinism — Eliminate Sources of Flakiness
 
-### Test Pipeline Order
-1. Lint and type check (fastest)
+Every flaky test has a root cause. Retries hide flakiness; they do not fix it, and they let unreliable tests rot the signal of the suite.
+
+| Source of flakiness | Fix |
+|---------------------|-----|
+| Clock (`now`, dates, timers) | Inject a clock; freeze time in the test |
+| Randomness (UUIDs, random IDs) | Seed the PRNG, or inject a generator |
+| Network | Stub at the boundary, or use a hermetic test container |
+| Shared mutable state across tests | Reset between tests; never rely on test order |
+| Hardcoded sleeps / timeouts | Wait for explicit conditions, not wall-clock duration |
+| Order dependence | Randomize test order in CI to surface hidden coupling |
+| Parallel collisions on shared resources | Give each test a unique namespace (schema, key prefix, temp dir) |
+
+Quarantine a test that flakes; do not retry it into green. Track quarantined tests and fix them — a permanent quarantine is a deleted test in disguise.
+
+---
+
+## Test Isolation
+
+Each test sets up its own state and cleans up after itself. No test depends on another test having run first.
+
+- Reset shared state (DB, caches, in-process singletons, env vars) between tests
+- Prefer transaction-per-test with rollback for DB integration tests — fast, automatic cleanup, no order dependence
+- For DBs without transactional rollback support, truncate or restore between tests
+- Never run tests against production or shared development databases — use a dedicated test database, ideally containerized
+
+---
+
+## Fixtures and Factories
+
+| Approach | Use when |
+|----------|----------|
+| **Fixture (static data)** | Reference data shared across many tests; rarely changes |
+| **Factory (function that builds data)** | Test-specific records; each test customizes only the fields it cares about |
+
+Factory rules:
+- Build the minimum valid object by default; override per test
+- Keep relevant data visible in the test — values the test asserts on must appear in the test, not be buried in a shared fixture (the "Mystery Guest" anti-pattern destroys readability)
+- Randomize irrelevant fields so tests do not accidentally couple to them; keep randomness seeded and reproducible
+
+---
+
+## Coverage
+
+Coverage measures execution, not correctness. A 100% covered function can still be wrong.
+
+- Target meaningful coverage of branches, error paths, and boundaries — not a number
+- Treat coverage as a floor that signals untested areas, not a ceiling worth gaming
+- Reasonable defaults: ~60% acceptable, ~75% commendable, ~90% exemplary for critical modules
+- Never write assertion-free tests, empty try/catch, or duplicated tests to hit a target
+
+---
+
+## Anti-patterns to Avoid
+
+| Smell | Why it hurts |
+|-------|-------------|
+| **Assertion Roulette** | Multiple unrelated assertions in one test — failure does not point to a cause |
+| **Mystery Guest** | Critical data lives in an external file or shared fixture — the test cannot be read in isolation |
+| **Conditional Logic in Tests** | `if`/loops in tests hide what is actually being tested; a test should describe one path |
+| **Test Interdependence** | Test B passes only because test A ran first — fragile and order-sensitive |
+| **Sleeping for Time** | Hardcoded waits flake under load; wait for conditions instead |
+| **Mocking the Target** | Tests the mock, not the code |
+| **Over-mocking Collaborators** | Tests pass even when integration is broken |
+| **Snapshot Bloat** | Large auto-updated snapshots become rubber-stamps; no one reviews the diff |
+
+---
+
+## Snapshot Testing
+
+Snapshots detect *change*, not *correctness*. Use only when:
+- The output is stable and well-defined
+- The diff is small enough that a reviewer will actually read it
+- The CI is configured to fail (not auto-create) on missing snapshots
+
+Avoid wide DOM snapshots, huge serialized structures, or anything a reviewer will bulk-update without reading. Treat snapshot files as code subject to review.
+
+---
+
+## CI Strategy
+
+Run cheapest checks first; fail fast.
+
+1. Lint and static analysis
 2. Unit tests
 3. Integration tests
-4. E2E tests (slowest, run on staging)
+4. End-to-end tests
 
-### CI Configuration Requirements
-- Run tests on every PR
-- Block merge if tests fail
-- Generate coverage reports
-- Cache dependencies for speed
-- Use test database in CI environment
-
-### Parallel Test Execution
-- Unit tests: Run in parallel (no shared state)
-- Integration tests: May need sequential for DB access
-- E2E tests: Run in parallel with isolated data
+Rules:
+- Every PR runs the suite; failure blocks merge
+- Tests run in parallel — surface hidden coupling, do not paper over it
+- Each parallel worker uses isolated resources (own DB schema, own temp dir, own port range)
+- Do not auto-retry to mask flakiness; quarantine and fix instead
+- Randomize test order to detect order dependence
+- Cache dependencies; never cache test results across commits
 
 ---
 
-## Testing Best Practices
+## Performance Tests (when needed)
 
-### DO
-- Run tests before pushing to remote
-- Write tests before or alongside code (TDD optional but encouraged)
-- Test behavior, not implementation details
-- Use descriptive test names that explain what is being tested
-- Keep tests independent (no order dependencies)
-- Clean up test data and side effects
-
-### DON'T
-- Commit failing tests
-- Test private methods directly (test through public interface)
-- Write tests that depend on other tests
-- Use production data in tests
-- Mock everything (integration tests need real dependencies)
-- Ignore flaky tests (fix or delete them)
+For performance-critical paths only:
+- Define an explicit budget (latency, throughput, memory)
+- Assert against the budget; do not just measure
+- Run on consistent hardware (CI containers, not laptops) to avoid noise
+- Treat performance regressions as test failures, not warnings
 
 ---
 
-## Edge Cases Checklist
+## Edge Cases — Always Probe These
 
-Always test these scenarios:
+**Input shape:** empty, null/undefined, wrong type, boundary values (0, -1, max), unicode, very long, malformed.
 
-### Input Validation
-- [ ] Empty strings and arrays
-- [ ] Null and undefined values
-- [ ] Invalid data types
-- [ ] Boundary values (0, -1, MAX_INT)
-- [ ] Special characters and unicode
-- [ ] Very long strings
-- [ ] Malformed JSON/data
+**State and timing:** empty state, concurrent operations, race conditions, retries, timeouts, partial failures.
 
-### State & Timing
-- [ ] Concurrent operations
-- [ ] Race conditions
-- [ ] Timeout scenarios
-- [ ] Retry logic
-- [ ] Empty state (no data)
-- [ ] Loading states
-
-### Error Conditions
-- [ ] Network failures
-- [ ] Database connection errors
-- [ ] Invalid authentication
-- [ ] Permission denied
-- [ ] Resource not found
-- [ ] Rate limiting
-
----
-
-## Performance Testing (Optional)
-
-For performance-critical applications:
-
-- Benchmark critical functions
-- Load test API endpoints
-- Test with realistic data volumes
-- Monitor memory usage in tests
-- Set performance budgets (response time < 200ms)
-
-```typescript
-// Simple performance test
-it('processes 1000 items under 100ms', () => {
-  const items = Array(1000).fill(testItem);
-  const start = performance.now();
-
-  processItems(items);
-
-  expect(performance.now() - start).toBeLessThan(100);
-});
-```
+**Errors:** network failure, dependency unavailable, auth failure, permission denied, not found, rate limited.

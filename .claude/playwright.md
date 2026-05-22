@@ -1,31 +1,70 @@
 # Browser Verification with Playwright MCP
 
-When work involves a browser-rendered surface — UI/frontend changes, web flow verification, backend changes a browser actually hits, or finding context from JavaScript-heavy sites — default to Playwright MCP (`mcp__playwright__browser_*` tools) rather than reasoning from code alone. Type checks and tests verify code correctness; they do not verify what a user actually sees, and reasoning about a rendered page without opening it is guessing.
+Type checks and unit tests verify code correctness; they do not verify what a browser actually renders, sends, or executes. For any browser-rendered surface, drive Playwright MCP (`mcp__playwright__browser_*` tools) and observe real behavior — reasoning from source alone is guessing.
 
-## Use cases
+## When to reach for Playwright MCP
 
-- **UI/frontend changes**: after implementing, `browser_navigate` to the dev server, drive the relevant flow (click, fill, submit), check `browser_console_messages` and `browser_network_requests` for errors, then capture with the right tool — `browser_snapshot` for structural checks (did the right element appear, did state update correctly?) returns text, while `browser_take_screenshot` returns rendered pixels and is the only way to verify CSS/styling/visual layout. For responsive work, drive `browser_resize` through breakpoints and screenshot each. "Tests pass" ≠ "the feature works," and a passing snapshot ≠ "it looks right."
-- **Backend changes a browser actually hits**: when an API change affects what the frontend sends or receives (payload shape, response format, headers, auth, status codes, CORS), drive the real frontend with `browser_navigate` and capture the actual request/response with `browser_network_requests`. This catches contract drift that backend integration tests miss because they don't reproduce what the live browser client sends — different headers, different cookie state, different content negotiation.
-- **Finding web context**: prefer `WebFetch` for static, public pages — faster and cheaper. Reach for Playwright when the site is SPA-rendered, requires interaction to reveal content, sits behind a login Playwright can perform, or `WebFetch` returned empty/broken HTML.
+| Situation | Action |
+|---|---|
+| UI/frontend change just landed | Navigate, drive the flow, capture state |
+| Backend change affects what the browser sends or receives | Drive the real client, inspect `browser_network_requests` |
+| Visual/layout/CSS work | Screenshot at the relevant viewports |
+| SPA, JS-rendered, login-gated, or interaction-gated content | Use Playwright (`WebFetch` returns empty HTML on these) |
+| Static, public HTML page | Use `WebFetch` — faster, cheaper, no browser cost |
 
-## Capture rules
+E2E browser checks sit at the top of the testing pyramid: highest confidence, highest cost. Use them to confirm user-visible behavior — not to replace unit or integration tests below them.
 
-- **`browser_wait_for` before capturing**: navigate-then-snapshot is the wrong default for SPAs and async-loaded content — the page hasn't settled, the data hasn't arrived, the screenshot looks valid but isn't. Wait for the specific element, text, or network state you're verifying, then capture.
-- **Capture only what you need**: snapshot a region, screenshot a component, request the specific network entry — full-DOM snapshots and full-page screenshots can be tens of thousands of tokens or hundreds of KB.
-- **Mask secrets and PII before reporting captures**: tokens, cookies, session IDs, and any visible personal data. Once leaked into the transcript they don't come back.
+## Capture: snapshot vs screenshot
+
+Pick by what is being verified, not by habit. Both are expensive; pick one.
+
+| Goal | Tool | Why |
+|---|---|---|
+| Did the right element appear? Did state update? Is the role/text correct? | `browser_snapshot` | Returns accessibility tree (text). Stable across cosmetic changes. Supports partial matching. |
+| Does CSS/layout/styling/spacing look right? Visual regression across breakpoints? | `browser_take_screenshot` | Pixels are the only source of truth for visual correctness. |
+| Need both structure and visual context (rare) | Both, scoped | Default to one; add the other only when justified. |
+
+## Wait before capturing
+
+Playwright's action APIs (click, fill, navigate) auto-wait for actionability — visible, stable, enabled, editable. Capture APIs do not. Navigate-then-snapshot on an SPA captures a half-rendered page that looks valid but is not.
+
+- Use `browser_wait_for` against the specific element, text, or network condition being verified, then capture.
+- Never insert fixed-duration sleeps to "let the page settle." Fixed waits are flaky and slow; auto-waits and explicit conditions are the documented replacement.
+
+## Control token cost
+
+A single Playwright MCP snapshot can return tens of thousands of tokens; one published benchmark put a full task at ~114K tokens. Every navigation re-emits the full accessibility tree.
+
+- Scope captures: snapshot a region, screenshot a component, request the specific network entry — avoid full-page snapshots and full-DOM dumps.
+- Capture once per state change, not after every action.
+- Drop stale captures from working memory once a new state is verified.
+
+## Network verification
+
+API contract drift between frontend and backend is invisible to backend integration tests because those tests don't reproduce what the live client sends — headers, cookies, content negotiation, auth state all differ.
+
+- For any API change a browser hits, drive the real frontend with `browser_navigate` and inspect the actual request/response via `browser_network_requests` or `browser_network_request`.
+- Watch `browser_console_messages` for silent failures: many apps log API errors to the console without surfacing them in the UI.
+
+## Mask before reporting
+
+Anything captured into the transcript stays in the transcript. Playwright MCP is not a security boundary — captured data flows into the model context.
+
+- Redact tokens, cookies, session IDs, Authorization headers, and any visible PII before quoting snapshots, screenshots, or network entries.
+- Never paste raw response bodies that contain credentials or personal data.
 
 ## Never auto-start services
 
-If `browser_navigate` fails (connection refused, timeout, wrong port), surface that to the user and ask where the server is running — do NOT start it yourself. You can't reliably tell whether it's already running in another terminal, on a non-default port, or under a process you can't see; a duplicate start causes port conflicts and zombie processes, and you may run the wrong command for this project. Same applies to databases, workers, and any other long-lived service.
+If `browser_navigate` fails (connection refused, timeout, wrong port), report it and ask where the server is running. Do not start it. Detection is unreliable across terminals, ports, and process owners; a duplicate start causes port conflicts and zombie processes, and the wrong start command can corrupt local state. Same rule applies to databases, workers, and any other long-lived service.
 
-## Not installed?
+## When Playwright MCP is unavailable
 
-If the `mcp__playwright__browser_*` tools are not present in the available-tools list, install user-wide so Playwright MCP applies to every project on this machine, not just the current one:
+If the `mcp__playwright__browser_*` tools are absent from the tool list, install at user scope so every project on the machine inherits the server:
 
 ```bash
 claude mcp add --transport stdio --scope user playwright -- bunx @playwright/mcp@latest
 ```
 
-The user will see a permission prompt for that Bash command. If they decline, proceed without browser verification and explicitly surface the gap in the task report ("did not verify in browser — Playwright MCP unavailable") rather than silently degrading. Don't fall back to project scope or hand-edited config without asking — user scope is the deliberate default.
+After install, confirm the tools appear before continuing.
 
-After install, verify the `mcp__playwright__browser_*` tools appear in the available-tools list before continuing. Requires Bun.
+If install is declined or unavailable, proceed without browser verification and state the gap explicitly in the task report ("did not verify in browser — Playwright MCP unavailable"). Do not silently downgrade to code-only reasoning while implying the change was verified.

@@ -1,580 +1,375 @@
 # Database Guidelines
 
-## Migration Files
-
-- ALWAYS create migration files for schema changes
-- NEVER modify database directly in production
-- Name migrations: `{number}_{description}_{issue-number}.sql`
-  - Example: `001_add_user_roles_73.sql`
-  - Example: `002_create_events_table_45.sql`
-- Add indexes for frequently queried columns
-- Test migrations on copy of production data
-- Document schema changes in migration comments
+Universal rules for relational databases. Engine-agnostic. SQL examples illustrate principles, not mandates for a specific product.
 
 ---
 
-## Migration Best Practices
+## Migrations
 
-- NEVER modify existing migrations (create new one instead)
-- ALWAYS backup database before running migrations in production
-- Use transactions for multi-step migrations
-- Make migrations reversible when possible (include DOWN/rollback logic)
-- Test both up AND down migrations
-- Keep migrations small and focused (one logical change per migration)
-- Run migrations as part of deployment process
-- Version control all migrations
+### Core Rules
 
----
+- Every schema change ships as a versioned, version-controlled migration file. Never run ad-hoc DDL against production.
+- Once a migration is merged, treat it as immutable. Fix mistakes with a new migration, never by editing history.
+- One logical change per migration. Small migrations are reversible; large ones are not.
+- Test migrations against a recent production-data clone before production. Migration that runs in 2 seconds on dev can take 2 hours on prod-scale data.
+- Take a backup immediately before destructive operations in production.
 
-## Migration Structure
+### Naming
 
-Each migration should have:
-1. **Up migration**: Apply the change
-2. **Down migration**: Rollback the change (if possible)
-3. **Comments**: Explain why change is needed
+Use a **timestamp prefix**, not a sequence number. Timestamps prevent the merge conflicts that hit projects using sequential numbering: two parallel branches both create migration `0042`, and one has to be renamed and re-ordered after merge. Timestamps don't collide because each branch's local clock produces a unique value.
 
-### Example Migration (SQL)
+`{timestamp}_{verb_noun}.{ext}` — the property that matters is the timestamp sorts chronologically and is unique per migration. Exact format is whatever the migration tool generates; common shapes:
+
+| Shape | Example |
+|---|---|
+| Compact | `20230615143022_create_users_table` |
+| Separated | `2026_02_27_161559_add_unique_slug_to_products` |
+| Date + same-day counter | `2026_03_04_000000_create_user_carts_table` |
+
+The name part is `snake_case`, verb-first (`create_users_table`, `add_email_to_users`, `drop_legacy_orders`) — describes the action, not just the subject. Use the file extension the migration tool expects.
+
+### Reversibility
+
+Every migration has an UP and a DOWN. Test both. Migrations that cannot be reversed (data loss, format change) must be flagged and require a snapshot before apply.
+
+### Expand-Contract for Schema Changes That Can Break the App
+
+Any rename, type change, or column drop must use expand-contract — never modify the live shape in one step. The pattern runs over multiple deploys so the application is always compatible with the schema it sees.
+
+| Phase | Action | App state |
+|-------|--------|-----------|
+| Expand | Add new column/table/index alongside the old | Reads/writes old |
+| Dual-write | App writes to both old and new | Reads old, writes both |
+| Backfill | Copy historical data into the new shape in batches | Reads old, writes both |
+| Switch reads | App reads from new | Reads new, writes both |
+| Contract | Drop old column/table after a soak period | Reads/writes new only |
+
+Each phase is its own deploy with its own rollback point.
+
+### Locking Operations to Watch
+
+These operations take exclusive locks on large tables and block writes. Reach for the engine's non-blocking/online equivalent if one exists, or restructure the change into multiple safe steps.
+
+| Operation | Safer approach |
+|-----------|----------------|
+| Add an index on a large table | Use the engine's non-blocking/online index build if available. |
+| Set a column to `NOT NULL` on a full table | Add nullable → backfill in batches → enforce the constraint with the engine's "validate later" mechanism, then promote to `NOT NULL`. |
+| Change a column's type | Expand-contract: add a new column with the target type, dual-write, backfill, switch reads, drop the old column. |
+| Add a column with a non-constant default on a large table | Add nullable, backfill in batches, then set the default. |
+
+### Batched Backfills
+
+Long-running `UPDATE` over a large table holds locks and bloats logs. Process in batches with a primary-key range, commit per batch, and throttle.
+
 ```sql
--- Migration: 005_add_user_roles_73.sql
--- Issue: #73
--- Description: Add role column to support admin/user permissions
--- Author: developer@example.com
--- Date: 2025-01-01
-
--- Up Migration
-BEGIN;
-
-ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user';
-CREATE INDEX idx_users_role ON users(role);
-
-COMMIT;
-
--- Down Migration (commented, run manually if needed)
--- BEGIN;
--- DROP INDEX idx_users_role;
--- ALTER TABLE users DROP COLUMN role;
--- COMMIT;
-```
-
-### Example Migration (ORM - Knex.js)
-```typescript
-// migrations/20250101_add_user_roles.ts
-import { Knex } from 'knex';
-
-export async function up(knex: Knex): Promise<void> {
-  await knex.schema.alterTable('users', (table) => {
-    table.string('role', 20).notNullable().defaultTo('user');
-    table.index('role');
-  });
-}
-
-export async function down(knex: Knex): Promise<void> {
-  await knex.schema.alterTable('users', (table) => {
-    table.dropIndex('role');
-    table.dropColumn('role');
-  });
-}
+-- Loop in application code or stored procedure: bounded by primary key, small batch, commit each iteration
+UPDATE users SET status = 'active'
+WHERE id BETWEEN :lo AND :hi AND status IS NULL;
 ```
 
 ---
 
-## Primary Key Best Practices
+## Primary Keys
 
-### Use Unsigned Integers for IDs
+### Choosing a Key Type
+
+| Need | Choice | Why |
+|------|--------|-----|
+| Internal-only PK, single-writer system | Auto-increment integer (`BIGINT`) | Smallest index, sequential inserts, no fragmentation |
+| Externally exposed, distributed writers, or merging from multiple sources | UUIDv7 | Time-ordered → sequential B-tree inserts, low fragmentation, globally unique |
+| Externally exposed ID where guessability is unacceptable | UUIDv7 (or v4 with separate internal integer PK) | Non-enumerable |
+| Legacy / wide adoption | UUIDv4 only when nothing else fits | Random → fragmentation, ~3× slower inserts at scale, ~40% larger index |
+
+UUIDv7 embeds a millisecond timestamp prefix, so new IDs sort to the end of the B-tree and behave like auto-increment for insert performance. UUIDv4 is random and causes page splits, fragmentation, and index bloat at scale.
+
+### Sizing
+
+Choose the smallest type that fits the projected row count over the table's lifetime. PK width multiplies across every index and every foreign key.
+
+| Projected rows | Integer width |
+|---------------|---------------|
+| < 2 billion | 32-bit (`INT` / `INTEGER` / `SERIAL`) |
+| ≥ 2 billion | 64-bit (`BIGINT` / `BIGSERIAL`) |
+
+Use unsigned where the engine supports it (MySQL). Default to 64-bit when migration cost later would be high.
+
+### Hybrid External/Internal IDs
+
+For systems that need a public, non-guessable ID but also want integer PK performance: keep an `id BIGINT` primary key and add a `public_id UUID` column with a unique index. Internal joins use the integer; external APIs use the UUID.
+
+---
+
+## Foreign Keys and Referential Integrity
+
+- Declare foreign keys at the database level. The engine sees concurrent changes the application cannot and enforces integrity under all isolation levels.
+- Application-level integrity enforcement does not survive concurrent writers and breaks under any non-serializable isolation.
+- `ON DELETE` action: choose explicitly. `CASCADE` for owned child rows, `RESTRICT` (default) for references that must block deletion, `SET NULL` for optional references.
+- Index every foreign key column. The engine does not create this index automatically and lookups during cascade/restrict will scan the child table without it.
+- For cross-service or sharded boundaries where FKs are not possible, enforce in the application AND run a scheduled reconciliation job that detects orphans.
+
+---
+
+## Indexing
+
+### When to Add an Index
+
+- Column appears in a `WHERE`, `JOIN`, `ORDER BY`, or `GROUP BY` on a query that runs frequently or scans many rows.
+- Foreign key columns (always).
+- Unique constraints (engine creates the index automatically).
+
+### When Not to Add an Index
+
+- Tables under ~10K rows — sequential scan is faster than index lookup.
+- Columns with very low cardinality (boolean, small enum) without a partial-index predicate.
+- Write-heavy tables where the cost per insert/update outweighs read benefit. Every index doubles the write cost for the columns it covers.
+
+### Composite Index Column Order
+
+Order columns in a composite index by **how the query filters them**, not by selectivity alone. Rules:
+
+1. Columns used with equality (`=`, `IN`) come first.
+2. Columns used with range (`<`, `>`, `BETWEEN`) come last.
+3. `ORDER BY` columns follow equality columns and match the query's direction.
+4. The leftmost prefix determines reuse — `(a, b, c)` serves queries on `(a)`, `(a, b)`, `(a, b, c)` but not `(b)` or `(c)`.
+
+
+
+### Specialized Indexes
+
+| Use | Index type |
+|-----|------------|
+| Filter on a small subset of rows | Partial index with `WHERE` predicate |
+| Sort or filter on expression | Expression / functional index |
+| Full-text search | Engine-native full-text index (GIN / FULLTEXT / etc.) |
+| Cover a query entirely from index | Include all `SELECT` columns in the index (covering index / `INCLUDE`) |
+
+### Naming
+
+`idx_{table}_{col1}_{col2}[_partial|_gin]` — predictable, greppable, sorts together.
+
+---
+
+## Query Patterns
+
+### Always
+
+- Parameterize every value that comes from outside the query. Concatenation into SQL is the SQL-injection root cause and no input filtering substitutes for it.
+- Project only the columns needed. `SELECT *` blocks covering-index optimizations and ships unused bytes.
+- Add `LIMIT` to queries expected to return one row.
+- Run `EXPLAIN` / `EXPLAIN ANALYZE` on any query that touches a large table. Look for sequential scans on large tables, large gaps between estimated and actual rows, and nested loops over big inputs.
+
+### N+1 Prevention
+
+The N+1 pattern (one parent query + one child query per parent) is the most common ORM performance bug. Detection: count queries per request and watch for any loop that issues a query.
+
+Three fixes, in order of preference:
+
+| Pattern | When | How |
+|---------|------|-----|
+| Join in a single query | The parent + children fit in one result | `JOIN` and read children from the row |
+| Eager / batch loading | Children needed for all parents, ORM-mediated | Collect parent IDs, issue one `WHERE child.parent_id IN (...)` query |
+| DataLoader / per-request batching | Children fetched from many code paths in one request | Coalesce all requests in a tick, issue one batched query, distribute results |
+
+Avoid blanket "always eager-load" — it inverts the problem into over-fetching.
+
+### Pagination
+
+| Use | Pattern | Why |
+|-----|---------|-----|
+| Sequential browsing, feeds, sync, infinite scroll | Keyset (cursor) pagination | O(page size) per page at any depth |
+| Jump to arbitrary page number | Offset / limit, only on small datasets | O(offset) — degrades catastrophically deep |
+
+Keyset query shape: `WHERE (sort_col, id) < (:cursor_sort, :cursor_id) ORDER BY sort_col DESC, id DESC LIMIT :n`. The index must match the sort columns and direction. At deep pages, keyset is thousands of times faster than offset.
+
+### Common Rewrites
+
 ```sql
--- Good: Unsigned gives double the positive range
-CREATE TABLE users (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,  -- MySQL
-  -- or
-  id SERIAL PRIMARY KEY,                        -- PostgreSQL (always unsigned)
-  ...
-);
-```
+-- Existence check: use EXISTS, not COUNT(*) > 0
+SELECT 1 FROM orders WHERE user_id = :id LIMIT 1;          -- good
+SELECT COUNT(*) FROM orders WHERE user_id = :id;           -- scans all matches
 
-### Why Unsigned?
-- IDs are always positive (no need for negative values)
-- Double the range: ~4.3 billion vs ~2.1 billion for signed INT
-- Makes intent clear that IDs should never be negative
-- Catches bugs if negative values are accidentally used
+-- Batch insert
+INSERT INTO logs (message) VALUES ('a'), ('b'), ('c');     -- good
+-- Multiple single INSERTs                                 -- one round-trip per row
 
-### ID Type Guidelines
-| Table Size | Recommended Type |
-|------------|------------------|
-| < 16 million rows | `MEDIUMINT UNSIGNED` (MySQL) |
-| < 4 billion rows | `INT UNSIGNED` / `SERIAL` |
-| > 4 billion rows | `BIGINT UNSIGNED` / `BIGSERIAL` |
-
-### Alternative: UUIDs
-```sql
--- Use for distributed systems or when IDs shouldn't be guessable
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),  -- PostgreSQL
-  ...
-);
+-- Aggregation: filter before grouping
+SELECT user_id, COUNT(*) FROM events
+WHERE created_at >= :since GROUP BY user_id;               -- good — index on created_at applies
 ```
 
 ---
 
-## Dangerous Operations
+## Transactions and Concurrency
 
-Handle these with extra care:
+### Transaction Scope
 
-### Adding NOT NULL Columns
-```sql
--- Step 1: Add as nullable
-ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+- Keep transactions short. Long transactions hold locks, increase deadlock probability, and bloat MVCC history.
+- Never include user input, network calls, or external API calls inside a transaction. Acquire data first, then open the transaction, then commit.
+- Touch tables in a consistent order across all transactions to prevent circular-wait deadlocks.
 
--- Step 2: Populate data
-UPDATE users SET phone = 'unknown' WHERE phone IS NULL;
+### Isolation Levels
 
--- Step 3: Add NOT NULL constraint (separate migration)
-ALTER TABLE users ALTER COLUMN phone SET NOT NULL;
-```
+Default to the engine's default (`READ COMMITTED` for Postgres, `REPEATABLE READ` for MySQL/InnoDB) unless the workload requires otherwise.
 
-### Dropping Columns
-```sql
--- Step 1: Deprecate in code (stop using column)
--- Step 2: Wait for deployment to propagate
--- Step 3: Drop column in later migration
-ALTER TABLE users DROP COLUMN deprecated_field;
-```
+| Level | Use when |
+|-------|----------|
+| `READ COMMITTED` | General OLTP; reads see only committed data |
+| `REPEATABLE READ` | Multi-statement transaction must see a stable snapshot |
+| `SERIALIZABLE` | Correctness requires no anomalies; accept retries on conflict |
 
-### Renaming Columns
-```sql
--- Option 1: Direct rename (if DB supports and no downtime needed)
-ALTER TABLE users RENAME COLUMN old_name TO new_name;
+Snapshot isolation (`SERIALIZABLE` in Postgres, RCSI in SQL Server) reduces blocking without giving up consistency. Application code must handle serialization-failure retries.
 
--- Option 2: Safe multi-step rename
--- 1. Add new column
--- 2. Copy data
--- 3. Update code to use new column
--- 4. Drop old column
-```
+### Deadlocks
 
-### Large Data Migrations
-```sql
--- Use batch processing, not single transaction
-DO $$
-DECLARE
-  batch_size INT := 1000;
-  offset_val INT := 0;
-BEGIN
-  LOOP
-    UPDATE users
-    SET status = 'active'
-    WHERE id IN (
-      SELECT id FROM users
-      WHERE status IS NULL
-      LIMIT batch_size OFFSET offset_val
-    );
-
-    EXIT WHEN NOT FOUND;
-    offset_val := offset_val + batch_size;
-    COMMIT;
-  END LOOP;
-END $$;
-```
-
----
-
-## ORM Usage Patterns
-
-### Query Builder Best Practices
-```typescript
-// Good: Select specific columns
-const users = await db('users')
-  .select('id', 'email', 'name')
-  .where('status', 'active');
-
-// Bad: Select all columns
-const users = await db('users').select('*');
-
-// Good: Use transactions
-await db.transaction(async (trx) => {
-  const userId = await trx('users').insert({ email });
-  await trx('profiles').insert({ userId, name });
-});
-
-// Good: Eager loading to avoid N+1
-const users = await User.query()
-  .withGraphFetched('orders')
-  .where('status', 'active');
-```
-
-### Model Patterns
-```typescript
-// Define relationships in models
-class User extends Model {
-  static tableName = 'users';
-
-  static relationMappings = {
-    orders: {
-      relation: Model.HasManyRelation,
-      modelClass: Order,
-      join: {
-        from: 'users.id',
-        to: 'orders.user_id'
-      }
-    }
-  };
-}
-```
-
-### Avoiding N+1 Queries
-```typescript
-// Bad: N+1 query
-const users = await User.query();
-for (const user of users) {
-  const orders = await user.$relatedQuery('orders'); // N queries!
-}
-
-// Good: Eager loading
-const users = await User.query().withGraphFetched('orders'); // 2 queries
-
-// Good: Join for filtering
-const usersWithOrders = await User.query()
-  .joinRelated('orders')
-  .where('orders.status', 'completed');
-```
+- Application code must catch deadlock errors and retry the transaction with backoff.
+- Missing indexes turn row-level locks into range/table scans that hold locks longer than necessary — index foreign keys and `WHERE` columns.
 
 ---
 
 ## Connection Pooling
 
-### Configuration Guidelines
-```typescript
-// knex.js example
-const config = {
-  client: 'pg',
-  connection: process.env.DATABASE_URL,
-  pool: {
-    min: 2,                    // Minimum connections
-    max: 10,                   // Maximum connections
-    acquireTimeoutMillis: 30000, // Wait time for connection
-    idleTimeoutMillis: 10000,  // Close idle connections after
-    reapIntervalMillis: 1000,  // Check for idle connections
-  }
-};
-```
+### Sizing
 
-### Pool Size Guidelines
-| Environment | Min | Max | Notes |
-|-------------|-----|-----|-------|
-| Development | 1 | 5 | Lower to save resources |
-| Production | 2 | 10-20 | Based on expected load |
-| Serverless | 1 | 1 | Use external pooler |
+Pool size is **not** "more is better". Past a point, more connections degrade throughput due to context-switching, lock contention, and shared-buffer pressure on the engine.
 
-### Connection Pool Best Practices
-- NEVER create new connections per request
-- Use connection pooler for serverless (PgBouncer, Prisma Accelerate)
-- Monitor connection usage and adjust pool size
-- Set appropriate timeouts to prevent connection leaks
-- Release connections promptly (use `finally` blocks)
+Starting formula (from PostgreSQL community, applies broadly): `pool_size = (cores × 2) + effective_spindle_count`. SSDs: `effective_spindle_count = 1`. Adjust from there based on observed wait times.
 
-```typescript
-// Good: Connection is automatically returned to pool
-async function getUser(id: string) {
-  return await db('users').where('id', id).first();
-}
+| Environment | Per-process max | Total across processes |
+|-------------|-----------------|------------------------|
+| Single-process app | ≈ `(cores × 2) + 1` | Same |
+| Multi-process / multi-instance app | 5–10 per instance | Sum ≤ engine `max_connections` minus headroom for ops |
+| Serverless (function-per-request) | 1 | Front with external pooler (PgBouncer, RDS Proxy, Supavisor) |
 
-// Bad: Manual connection management (avoid)
-const connection = await db.client.acquireConnection();
-try {
-  // ... use connection
-} finally {
-  db.client.releaseConnection(connection);
-}
-```
+### External Poolers
+
+Serverless and high-instance-count deployments must front the engine with a connection pooler. Each new database connection costs 50–100ms (TLS + auth + backend fork) and the engine cannot serve thousands of concurrent backends efficiently. Transaction-mode pooling (e.g. PgBouncer) gives the highest reuse but disallows session-scoped features (prepared statements caching across transactions, `LISTEN/NOTIFY`, session temp tables, `SET LOCAL`).
+
+### Configuration
+
+- Set acquisition timeout, idle timeout, and max lifetime explicitly. Defaults vary by driver and are rarely right.
+- Return connections to the pool promptly — release in a `finally` equivalent, never hold across awaits that touch unrelated work.
 
 ---
 
-## Database Seeding
+## Timestamps
 
-### Seed File Structure
-```
-seeds/
-├── 01_users.ts           # Run first (base data)
-├── 02_categories.ts      # Dependencies on users
-├── 03_products.ts        # Dependencies on categories
-└── development/          # Dev-only seed data
-    └── sample_data.ts
-```
-
-### Seed Best Practices
-```typescript
-// seeds/01_users.ts
-export async function seed(knex: Knex): Promise<void> {
-  // Clear existing data (development only!)
-  if (process.env.NODE_ENV === 'development') {
-    await knex('users').del();
-  }
-
-  // Insert seed data
-  await knex('users').insert([
-    { id: 'admin-1', email: 'admin@example.com', role: 'admin' },
-    { id: 'user-1', email: 'user@example.com', role: 'user' },
-  ]);
-}
-```
-
-### Seed Guidelines
-- Use fixed IDs for reference data (easier testing)
-- NEVER run destructive seeds in production
-- Separate reference data from test data
-- Use factories for large datasets
+- Store all timestamps as UTC, in a timezone-aware type when the engine offers one (`TIMESTAMP WITH TIME ZONE` / `TIMESTAMPTZ`).
+- Convert to a local zone only at the display boundary, using a zone-aware library and the IANA zone name (`Europe/Tallinn`), never a fixed offset.
+- Every mutable row carries `created_at` and `updated_at` with engine-set defaults / triggers, not application clocks. Application clocks drift and skew across instances.
+- Future timestamps (scheduled events) — store the user's IANA zone alongside the wall-clock time. UTC alone is wrong because zone rules change.
 
 ---
 
-## Indexing Strategy
+## Soft Delete and Data Retention
 
-### When to Add Indexes
-- Foreign key columns used in JOINs
-- Columns in WHERE clauses (frequently filtered)
-- Columns in ORDER BY (frequently sorted)
-- Columns in GROUP BY
-- Unique constraints (automatically indexed)
+Soft delete (a `deleted_at` column) is **not** GDPR-compliant erasure. A "right to be forgotten" request requires actual destruction such that recovery is impossible without disproportionate effort. A `deleted_at` flag fails that test by design.
 
-### When NOT to Add Indexes
-- Small tables (< 1000 rows)
-- Columns rarely used in queries
-- Columns with low cardinality (boolean, status with few values)
-- Tables with heavy INSERT/UPDATE operations
+### Decision Matrix
 
-### Index Types
-```sql
--- B-tree (default, most common)
-CREATE INDEX idx_users_email ON users(email);
+| Need | Approach |
+|------|----------|
+| Recoverable mistakes ("undelete" within N days) | Soft delete with scheduled hard-purge job |
+| Legal/compliance audit history of changes | Append-only audit table, separate from live row |
+| GDPR / "right to be forgotten" | Hard delete of personal data; retain non-personal audit metadata (hashed subject ID, action, timestamp) only |
+| High-volume ephemeral data (sessions, logs) | Hard delete with TTL |
 
--- Partial index (for filtered queries)
-CREATE INDEX idx_active_users ON users(email) WHERE status = 'active';
+### If Soft Delete Is Used
 
--- Composite index (multi-column)
-CREATE INDEX idx_orders_user_date ON orders(user_id, created_at DESC);
-
--- Unique index
-CREATE UNIQUE INDEX idx_users_email_unique ON users(email);
-
--- Full-text search (PostgreSQL)
-CREATE INDEX idx_posts_search ON posts USING gin(to_tsvector('english', title || ' ' || body));
-```
-
-### Index Naming Convention
-```
-idx_{table}_{column(s)}[_type]
-```
-Examples:
-- `idx_users_email`
-- `idx_orders_user_id_created_at`
-- `idx_posts_search_gin`
-
----
-
-## Query Optimization
-
-### General Rules
-- ALWAYS use parameterized queries (prevent SQL injection)
-- Avoid `SELECT *` (specify needed columns)
-- Use `EXPLAIN ANALYZE` to analyze query performance
-- Avoid N+1 queries (use JOINs or eager loading)
-- Use pagination for large result sets
-- Add appropriate indexes based on query patterns
-
-### Query Analysis
-```sql
--- Analyze query execution plan
-EXPLAIN ANALYZE
-SELECT u.*, COUNT(o.id) as order_count
-FROM users u
-LEFT JOIN orders o ON u.id = o.user_id
-WHERE u.status = 'active'
-GROUP BY u.id;
-
--- Look for:
--- - Seq Scan on large tables (add index)
--- - High actual rows vs estimated rows (update statistics)
--- - Nested loops on large datasets (consider hash join)
-```
-
-### Common Optimizations
-```sql
--- Use EXISTS instead of COUNT for existence check
--- Bad
-SELECT * FROM users WHERE (SELECT COUNT(*) FROM orders WHERE user_id = users.id) > 0;
-
--- Good
-SELECT * FROM users WHERE EXISTS (SELECT 1 FROM orders WHERE user_id = users.id);
-
--- Use LIMIT for single row queries
--- Bad
-SELECT * FROM users WHERE email = 'test@example.com';
-
--- Good
-SELECT * FROM users WHERE email = 'test@example.com' LIMIT 1;
-
--- Batch inserts
--- Bad: Multiple INSERT statements
-INSERT INTO logs (message) VALUES ('log1');
-INSERT INTO logs (message) VALUES ('log2');
-
--- Good: Single INSERT with multiple values
-INSERT INTO logs (message) VALUES ('log1'), ('log2'), ('log3');
-```
-
----
-
-## Backup & Recovery
-
-### Backup Strategy
-| Type | Frequency | Retention | Use Case |
-|------|-----------|-----------|----------|
-| Full backup | Daily | 30 days | Complete restore |
-| Incremental | Hourly | 7 days | Point-in-time recovery |
-| Transaction logs | Continuous | 7 days | Minimal data loss |
-
-### Backup Commands (PostgreSQL)
-```bash
-# Full backup
-pg_dump -Fc database_name > backup_$(date +%Y%m%d).dump
-
-# Restore from backup
-pg_restore -d database_name backup_20250101.dump
-
-# Point-in-time recovery (requires WAL archiving)
-pg_restore --target-time="2025-01-01 12:00:00" -d database_name
-```
-
-### Backup Best Practices
-- Test restore process regularly (monthly)
-- Store backups in different location than database
-- Encrypt backup files at rest
-- Monitor backup job success/failure
-- Document recovery procedures
-- Calculate Recovery Point Objective (RPO) and Recovery Time Objective (RTO)
-
----
-
-## Soft Deletes vs Hard Deletes
-
-### Soft Deletes
-```sql
--- Add deleted_at column
-ALTER TABLE users ADD COLUMN deleted_at TIMESTAMP;
-
--- Soft delete
-UPDATE users SET deleted_at = NOW() WHERE id = 'user-1';
-
--- Query active records
-SELECT * FROM users WHERE deleted_at IS NULL;
-
--- Create partial index for performance
-CREATE INDEX idx_users_active ON users(email) WHERE deleted_at IS NULL;
-```
-
-### When to Use Soft Deletes
-- Audit trail required
-- Data recovery needs
-- Referential integrity concerns
-- Legal/compliance requirements
-
-### When to Use Hard Deletes
-- GDPR "right to be forgotten"
-- Performance-critical tables
-- Temporary/session data
-- No audit requirements
+- Add `deleted_at TIMESTAMPTZ NULL`; never use a boolean.
+- Every query against the table must filter `deleted_at IS NULL` — enforce with a view or a query helper, not by remembering.
+- Partial unique indexes: `CREATE UNIQUE INDEX ... ON table (email) WHERE deleted_at IS NULL;` so a deleted row does not block re-registration.
+- Schedule a hard-purge job that removes rows older than the retention window.
 
 ---
 
 ## Audit Logging
 
-### Audit Table Pattern
+### Goals to Separate
+
+| Goal | Mechanism |
+|------|-----------|
+| "Who changed this row, when, from what to what" | Append-only audit table, written by trigger or CDC |
+| "Replay the system from any point in time" | Event sourcing or transaction-log capture |
+| "Detect tampering" | Hash-chained audit rows or write to an isolated, append-only store |
+| "Security forensics" | Database audit feature (engine-native) + isolated log sink |
+
+### Append-Only Audit Table
+
+A generic audit table separates audit data from the live row and survives schema changes:
+
 ```sql
 CREATE TABLE audit_log (
-  id SERIAL PRIMARY KEY,
-  table_name VARCHAR(100) NOT NULL,
-  record_id VARCHAR(100) NOT NULL,
-  action VARCHAR(20) NOT NULL,  -- INSERT, UPDATE, DELETE
-  old_values JSONB,
-  new_values JSONB,
-  user_id VARCHAR(100),
-  ip_address VARCHAR(50),
-  created_at TIMESTAMP DEFAULT NOW()
+  id            BIGSERIAL PRIMARY KEY,
+  table_name    TEXT      NOT NULL,
+  record_id     TEXT      NOT NULL,
+  action        TEXT      NOT NULL CHECK (action IN ('INSERT','UPDATE','DELETE')),
+  old_row       JSONB,
+  new_row       JSONB,
+  actor_id      TEXT,
+  ip_address    INET,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-CREATE INDEX idx_audit_table_record ON audit_log(table_name, record_id);
-CREATE INDEX idx_audit_created_at ON audit_log(created_at);
+CREATE INDEX idx_audit_table_record ON audit_log (table_name, record_id);
+CREATE INDEX idx_audit_created_at   ON audit_log (created_at);
 ```
 
-### Trigger-Based Auditing (PostgreSQL)
-```sql
-CREATE OR REPLACE FUNCTION audit_trigger()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO audit_log (table_name, record_id, action, old_values, new_values, user_id)
-  VALUES (
-    TG_TABLE_NAME,
-    COALESCE(NEW.id, OLD.id)::text,
-    TG_OP,
-    CASE WHEN TG_OP = 'DELETE' THEN row_to_json(OLD) ELSE NULL END,
-    CASE WHEN TG_OP != 'DELETE' THEN row_to_json(NEW) ELSE NULL END,
-    current_setting('app.current_user_id', true)
-  );
-  RETURN COALESCE(NEW, OLD);
-END;
-$$ LANGUAGE plpgsql;
+Triggers write rows automatically on every `INSERT/UPDATE/DELETE` to audited tables.
 
--- Apply to table
-CREATE TRIGGER users_audit
-AFTER INSERT OR UPDATE OR DELETE ON users
-FOR EACH ROW EXECUTE FUNCTION audit_trigger();
-```
+### Change Data Capture (CDC)
+
+For audit at scale, large numbers of tables, or downstream consumers (search indexes, analytics): use log-based CDC reading the engine's write-ahead/transaction log. CDC is asynchronous, lightweight on the source, and preserves commit order. It does **not** capture the application user — pair CDC with an application-set context variable (`SET LOCAL app.actor_id = ...`) or with engine-native audit.
+
+### What Audit Must Never Contain
+
+Passwords, password hashes, full payment card numbers, raw tokens, plaintext personal data subject to erasure requests. Treat audit rows as sensitive and apply the same access controls as the source data.
 
 ---
 
-## Database Testing
+## Seeding
 
-### Test Database Setup
-```typescript
-// Use separate test database
-const testConfig = {
-  ...config,
-  connection: process.env.TEST_DATABASE_URL
-};
+Seeds populate reference data (countries, roles, currencies) and small fixture sets. They are **not** a substitute for migrations.
 
-// Reset before each test suite
-beforeAll(async () => {
-  await db.migrate.latest();
-  await db.seed.run();
-});
+- Reference seeds use fixed primary keys so tests and foreign-key references are stable across environments.
+- Seeds are idempotent: re-running them does not duplicate or destroy rows. `INSERT ... ON CONFLICT DO NOTHING` / `MERGE` / equivalent upsert.
+- Destructive seed steps (`TRUNCATE`) only run when an explicit environment guard is set (`SEED_DESTRUCTIVE=1`) and never on production.
+- Large synthetic datasets belong to a factory/generator, not to checked-in seed files.
 
-// Clean after each test
-afterEach(async () => {
-  await db('users').del();
-  await db('orders').del();
-});
+---
 
-// Destroy connection after all tests
-afterAll(async () => {
-  await db.destroy();
-});
-```
+## Testing
 
-### Transaction-Based Test Isolation
-```typescript
-// Wrap each test in transaction, rollback after
-let trx: Knex.Transaction;
+### Test Database Is a Real Database
 
-beforeEach(async () => {
-  trx = await db.transaction();
-});
+Integration tests run against a real instance of the same engine and version as production. SQLite-as-stand-in for Postgres/MySQL produces false greens — different SQL dialects, different transaction semantics, different type coercion.
 
-afterEach(async () => {
-  await trx.rollback();
-});
+### Isolation Between Tests
 
-it('creates user', async () => {
-  await trx('users').insert({ email: 'test@example.com' });
-  const user = await trx('users').where('email', 'test@example.com').first();
-  expect(user).toBeDefined();
-  // Rollback happens in afterEach - no cleanup needed
-});
-```
+Two viable strategies; pick one per project.
+
+| Strategy | Cost per test | Parallel-safe | Notes |
+|----------|---------------|---------------|-------|
+| Transaction wrap + rollback | ~1–4 ms | Yes, with per-test connection | Cannot test code that itself starts/commits transactions |
+| Truncate-all between tests | ~20–500 ms | Difficult — needs per-test schema or DB | Tests can use real transactions |
+
+
+
+### Setup Order
+
+1. Apply all migrations to the test database before any tests run.
+2. Seed reference data once per suite.
+3. Per-test: either open transaction → run test → rollback, or run test → truncate affected tables.
+4. Tear down connections in suite teardown, not per test.
+
+### What to Test at the Database Layer
+
+- Migrations apply cleanly and roll back cleanly on a clone of production schema.
+- Constraints (unique, foreign key, check) actually reject the bad input — not just the application layer.
+- Critical query plans do not regress (`EXPLAIN` assertion or query-plan snapshot) on representative data volumes.
+
+---
+
+## Normalization
+
+- Default to 3NF / BCNF for transactional (OLTP) schemas. Inserts and updates touch one place, integrity is structural.
+- Denormalize deliberately, with a documented reason and a maintenance plan (trigger, materialized view, or scheduled refresh). Never denormalize by accident through cut-and-paste schemas.
+- Analytical (OLAP) workloads use star/snowflake or wide denormalized tables in a separate store, not the OLTP database.

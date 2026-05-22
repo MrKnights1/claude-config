@@ -242,14 +242,13 @@ apply_downloads() {
 # Source files to download
 guideline_files=(
     "security.md"
-    "security-review.md"
     "testing.md"
     "api-design.md"
     "structure.md"
     "database.md"
     "standards.md"
-    "project-init.md"
     "playwright.md"
+    "naming.md"
 )
 
 skill_dirs=(

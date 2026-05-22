@@ -1,608 +1,293 @@
 # Security Guidelines
 
-**Based on OWASP Application Security Verification Standard (ASVS) v4.0.3**
+Anchored to OWASP ASVS v5.0.0 (May 2025) and OWASP Top 10:2025. Universal rules — no language-specific mandates.
 
-This document provides actionable security requirements following OWASP ASVS. When writing code, ALWAYS follow these guidelines to ensure application security.
+---
 
-## Quick Reference - Critical Security Rules
+## Critical Rules
 
-### ALWAYS
+### Always
 - Use parameterized queries for all database operations
-- Validate AND sanitize all user input
-- Use context-appropriate output encoding (HTML, JavaScript, URL)
-- Hash passwords with bcrypt/scrypt/Argon2 (minimum cost factor 12)
-- Use cryptographically secure random generation for security tokens (crypto.randomBytes, random_bytes)
-- Implement CSRF protection on state-changing requests
-- Set secure session cookie flags (httpOnly, secure, sameSite)
-- Enforce HTTPS in production
-- Return generic error messages to users
-- Log security events with proper metadata
-- Validate file uploads by content (MIME), not extension
-- Store secrets in environment variables
-- Implement rate limiting on authentication endpoints
-- Require MFA for sensitive applications
+- Validate and encode output per context (HTML, JS, URL, attribute)
+- Hash passwords with Argon2id (preferred), scrypt, or bcrypt
+- Generate security tokens with a cryptographically secure PRNG (>=128 bits entropy)
+- Protect state-changing requests with synchronizer-token or double-submit CSRF defense
+- Set session cookies with `HttpOnly`, `Secure`, `SameSite=Lax` or `Strict`
+- Enforce TLS 1.2+ (1.3 preferred); redirect HTTP to HTTPS
+- Verify authorization server-side for every protected resource
+- Return generic error messages; log details server-side
+- Validate file uploads by parsed content type and magic bytes
+- Store secrets in a secrets manager or environment variables
+- Rate-limit authentication, password reset, and registration endpoints
+- Require phishing-resistant MFA (FIDO2/WebAuthn passkeys) for sensitive applications
 - Re-authenticate before sensitive account changes
-- Use industry-validated cryptographic libraries (OpenSSL, libsodium, crypto module)
-- Use strong cryptography (AES-GCM, SHA-256+, TLS 1.2+)
-- Verify authorization server-side for all protected resources
-- Use explicit origin lists for CORS configuration
-- Sanitize user input before logging to prevent log injection
+- Use vetted cryptographic libraries (libsodium, platform crypto module, OpenSSL)
+- Use authenticated encryption (AES-GCM, ChaCha20-Poly1305)
+- Restrict CORS to an explicit allowlist of origins
+- Sanitize untrusted input before logging to prevent log injection
+
+### Never
+- Concatenate user input into SQL, OS commands, or template strings
+- Implement custom cryptography
+- Use MD5, SHA-1, ECB mode, TLS <1.2, or the JWT `none` algorithm
+- Log passwords, full tokens, PAN, CVV, or unmasked PII
+- Send sensitive data in URLs or query strings
+- Trust client-side validation or client-side authorization
+- Use non-cryptographic PRNGs (e.g. Math.random) for secrets
 
 ---
 
 ## Data Protection
 
-### Data Classification & Documentation (ASVS V14)
-- Identify and classify all sensitive data in your application (PII, credentials, financial data, health data)
-- Document protection requirements for each data classification level
-- Define data retention policies and implement automated deletion schedules
-- NEVER send sensitive data in URLs or query strings (use HTTP body or headers only)
+- Classify data (public, internal, confidential, restricted) and document handling per class.
+- Encrypt restricted data at rest (AES-256-GCM) and in transit (TLS 1.2+).
+- Define retention windows and automate deletion of expired records.
+- Strip metadata (EXIF, document properties) from uploaded files before storage.
+- Set `Cache-Control: no-store` on responses containing sensitive data.
+- Set `Clear-Site-Data: "cache", "cookies", "storage"` on logout responses.
+- Never share sensitive data with third-party analytics or tracking services.
 
-### Secret Management
-- NEVER store passwords, API keys, tokens, or secrets in plain text
-- ALWAYS use environment variables for secrets (process.env.SECRET_NAME in Node.js, $_ENV in PHP), never hardcode them
-- Ensure .gitignore includes .env, .env.local, .htpasswd, config.php, and similar sensitive files
-- Use separate environment variables for different environments (dev, staging, production)
+---
 
-### Password Storage (ASVS V6)
-- Hash passwords using bcrypt, scrypt, or Argon2 (minimum cost factor 12 for bcrypt)
-  - PHP: password_hash() with PASSWORD_BCRYPT or PASSWORD_ARGON2ID
-  - Node.js: bcrypt or argon2 library
-- NEVER store password hints or security questions
-- Validate passwords against top 3,000 common passwords during registration/changes
+## Secret Management
 
-### Sensitive Data Handling
-- Return only necessary sensitive information (mask complete details unless explicitly requested)
-- Remove sensitive metadata from user-uploaded files before storage
-- Clear sensitive data from server-side caches after use or securely purge
-- Implement automated deletion of outdated sensitive data
-- NEVER send sensitive data to third-party tracking/analytics services
-- Set Cache-Control: no-store for responses containing sensitive data
-- Use Clear-Site-Data header to remove authenticated data from browser on logout
+- Never put secrets in source code, config files committed to the repo, container images, or client-side code.
+- Read secrets from environment variables or an external secret store at runtime.
+- Use distinct credentials per environment (dev, staging, production).
+- Add `.env`, `.env.*`, credential files, and key material to `.gitignore` before the first commit.
 
-## Input Validation & Sanitization
+---
 
-### Encoding & Output Context (ASVS V1)
-- Decode all input data only once into canonical form before processing
-- Apply output encoding as the final step before sending to any interpreter
-- Use context-appropriate encoding for the target interpreter:
-  - HTML context: Escape <, >, &, ", ' characters
-  - JavaScript/JSON: Use proper JSON encoding
-  - URL context: Use URL encoding or base64url
-  - SQL: Use parameterized queries (never encoding)
-  - OS commands: Use parameterized commands
+## Passwords (NIST SP 800-63B Rev 4)
 
-### Injection Prevention
-- **SQL Injection**: Use parameterized queries or ORM methods (NEVER concatenate user input into SQL)
-- **XSS Prevention**: Sanitize HTML output to prevent cross-site scripting:
-  - PHP: htmlspecialchars($input, ENT_QUOTES, 'UTF-8')
-  - React: Use JSX (auto-escapes), or DOMPurify for rich content
-  - Node.js: Use libraries like validator, xss, or DOMPurify
-- **WYSIWYG Content**: Sanitize all untrusted HTML from editors using well-known libraries (DOMPurify, nh3)
-- **Command Injection**: Use parameterized/safe APIs for OS commands, avoid system() and exec() with user input
-- **XML External Entity (XXE)**: Configure XML parsers to disable external entity processing
-- **Template Injection**: Avoid dynamic template generation with user input
-- **CSV Injection**: Follow RFC 4180, sanitize formulas in CSV exports
-- **LDAP/XPath Injection**: Use parameterized queries or escaping functions
-- **Deserialization**: Use allowlists for acceptable object types, avoid deserializing untrusted data
-- NEVER use eval() or dynamic code execution with user input
+- Minimum 15 characters when password is the sole factor; minimum 8 characters when paired with MFA.
+- Accept passwords up to at least 64 characters, including spaces and all printable ASCII/Unicode.
+- Do not impose composition rules (no required mixes of upper/lower/digit/symbol).
+- Block known-breached and top-common passwords on set/change (HIBP API, downloaded list).
+- Allow paste into password fields.
+- Do not require periodic rotation; rotate only on evidence of compromise.
+- Hash with **Argon2id** using `m=47104 (46 MiB), t=1, p=1` or `m=19456 (19 MiB), t=2, p=1`. If Argon2id unavailable, use scrypt, then bcrypt (cost >=12), then PBKDF2-HMAC-SHA256 (>=600k iterations).
+- Never store password hints or knowledge-based security questions.
 
-### Input Validation
-- ALWAYS validate user input type (string, number, email, etc.)
-- ALWAYS validate input length (min/max characters)
-- ALWAYS validate input format using regex or validation libraries (zod, joi, yup)
-- ALWAYS validate file upload types by checking file content (MIME type), not just extension
-- ALWAYS limit file upload sizes (e.g., max 5MB for images, max 10MB for documents)
-- Validate data on both client-side (UX) AND server-side (security)
+---
 
-## Authentication & Authorization
+## Authentication
 
-### Authentication Requirements (ASVS V6)
+- Provide phishing-resistant MFA (FIDO2/WebAuthn passkeys, hardware security keys) as the primary second factor.
+- Treat TOTP as acceptable but inferior to passkeys; treat SMS/email codes as a last-resort fallback only.
+- Limit OTP lifetime: <=10 minutes for out-of-band codes, 30 seconds for TOTP.
+- Return identical error messages and response times for invalid username vs invalid password (prevent account enumeration).
+- Rate-limit login (5 attempts / 15 min / IP+account), password reset (3 / 15 min), registration (5 / hour / IP).
+- Generate password reset and verification tokens with a CSPRNG, single-use, with short expiry (<=1 hour).
+- Password reset must not bypass MFA.
+- Re-authenticate before changing email, password, MFA factors, or recovery info.
 
-#### Password Policy
-- Enforce minimum 8-character passwords (15+ characters strongly recommended)
-- Validate against top 3,000 common passwords during registration and password changes
-- Allow unrestricted character composition (no mandatory complexity rules)
-- Allow paste functionality in password fields
-- Mask password input fields in UI
-- Process passwords exactly as submitted (no trimming or modification)
+---
 
-#### Multi-Factor Authentication (MFA)
-- Implement MFA for sensitive applications (Level 2+)
-- For high-security apps (Level 3), use hardware-based authentication (FIDO keys, device-bound passkeys)
-- NEVER use email as an authentication mechanism
-- NEVER use SMS/PSTN for Level 3 applications (prefer TOTPs or cryptographic methods)
-- Limit OTP lifetimes: 10 minutes for out-of-band codes, 30 seconds for TOTPs
-- Implement rate limiting against brute force and push bombing attacks on MFA endpoints
+## Authorization (OWASP Top 10:2025 A01 — #1 risk)
 
-#### Attack Prevention
-- Implement controls against credential stuffing and brute force attacks
-- Prevent user enumeration through:
-  - Consistent error messages ("Invalid credentials" not "Username not found")
-  - Consistent response times for valid and invalid users
-- Implement rate limiting on authentication endpoints:
-  - 5 attempts per 15 minutes for login
-  - 3 attempts per 15 minutes for password reset
-  - Include file locking to prevent race conditions in file-based systems
-  - Use express-rate-limit (Node.js) or custom file/Redis-based limiting
+- Deny by default; explicitly grant.
+- Derive the acting principal from the server-side session, never from a client-supplied identifier.
+- Check authorization on every request to every object — including reads.
+- Centralize access checks in middleware or a policy engine (e.g., OPA, Cedar); avoid per-handler ad-hoc checks.
+- Enforce ownership/tenancy in the data-access layer (parameterized `WHERE owner_id = :session.user`).
+- Treat IDOR/BOLA as the default failure mode: opaque IDs (UUIDs) reduce enumeration but do not replace authorization checks.
 
-#### Password Reset & Recovery
-- Generate initial passwords/codes using cryptographically secure random generation (crypto.randomBytes, random_bytes)
-- Enable secure password reset without bypassing MFA
-- NEVER use password hints or security questions
-- Support revocation of compromised authentication factors
+---
 
-#### Session Management
-- Regenerate session IDs after login to prevent session fixation
-- Use secure session cookies:
-  - httpOnly: true (prevent JavaScript access)
-  - secure: true (HTTPS only)
-  - sameSite: 'strict' or 'lax' (CSRF protection)
-  - PHP: session.cookie_httponly=1, session.cookie_secure=1, session.cookie_samesite="Strict"
-  - Express.js: Use express-session with proper cookie settings
+## Session Management
 
-#### Authorization
-- Verify user is authenticated and has permission to access requested resource before processing
-- Follow principle of least privilege: users should only access what they need
-- NEVER trust client-side authorization checks, always verify server-side
-- Re-authenticate users before sensitive account modifications (email, MFA, recovery info)
+- Generate session tokens with >=128 bits entropy from a CSPRNG.
+- Issue a new session ID on authentication; invalidate the pre-auth ID.
+- Verify session validity server-side on every request.
+- Enforce both an inactivity timeout and an absolute maximum lifetime; align with documented risk.
+- On logout, account disable, password change, or MFA change: invalidate all server-side sessions.
+- Allow account holders to view and terminate their active sessions.
+- Session cookies: `HttpOnly`, `Secure`, `SameSite=Lax` (default) or `Strict` (high-sensitivity), `Path=/`, and `__Host-` prefix where supported.
 
-#### Identity Provider Integration
-- When using external IdPs, combine IdP ID with user identifier to prevent identity spoofing
-- ALWAYS validate digital signatures on assertions (JWTs, SAML)
-- Verify authentication strength claims from external providers
-
-## Session Management (ASVS V7)
-
-### Documentation & Planning
-- Conduct risk analysis and document security decisions before implementation
-- Document session inactivity timeout and absolute maximum session lifetime
-- Define and document concurrent session policies
-
-### Token Generation & Security
-- Perform all session token verification on trusted backend services (NEVER on client-side)
-- Generate session tokens dynamically with at least 128 bits of entropy
-- Use cryptographically secure random generation (crypto.randomBytes, random_bytes)
-- Issue new tokens upon authentication, invalidating previous ones
-- Avoid static or predictable tokens
-
-### Session Timeouts
-Implement two types of timeouts:
-- **Inactivity timeout**: Forces re-authentication after periods of disuse
-- **Absolute maximum lifetime**: Requires re-authentication regardless of activity
-- Both must align with documented risk decisions
-
-### Session Termination
-- Logout and expiration must completely prevent further session use
-- Terminate all sessions when user accounts are disabled or deleted
-- Allow users to view and terminate their active sessions
-- Allow users to terminate other active sessions after security changes
-- Give administrators ability to terminate individual or all user sessions
-- Make logout functionality easy and visible on all authenticated pages
-
-### Abuse Prevention
-- Require full re-authentication for sensitive account modifications:
-  - Email address changes
-  - MFA configuration
-  - Recovery information updates
-  - Password changes
-- Users can view their active sessions
-- High-risk transactions may require additional authentication factors
-
-### Federated/SSO Systems
-- SSO providers must coordinate session lifetimes across applications
-- Ensure documented termination behavior
-- Require explicit user consent before session creation
+---
 
 ## CSRF Protection
 
-- ALWAYS implement CSRF protection for state-changing requests (POST, PUT, PATCH, DELETE)
-- Generate cryptographically secure tokens:
-  - PHP: bin2hex(random_bytes(32))
-  - Node.js: crypto.randomBytes(32).toString('hex')
-- Store token in session, embed in forms as hidden field
-- Validate token on server before processing request
-- Rotate token after successful validation to prevent reuse
-- Use CSRF middleware:
-  - Express.js: csrf-csrf or csrf-sync middleware
-  - PHP: Custom implementation or framework-provided (Laravel, Symfony)
-  - React/SPA: Include token in request headers (X-CSRF-Token)
+- Required for any cookie-authenticated state-changing request (POST, PUT, PATCH, DELETE).
+- Stateful apps: synchronizer token pattern — server-side per-session token, validated on each state change.
+- Stateless apps/APIs: double-submit cookie with signed/HMAC token, validated against header (`X-CSRF-Token`).
+- Generate tokens with a CSPRNG (>=128 bits entropy); reject missing/invalid tokens.
+- Treat `SameSite=Lax/Strict` as defense in depth, not a replacement for tokens.
+- Pure token-bearer APIs (no ambient cookie auth) do not need CSRF tokens but must reject cookie auth on those endpoints.
+
+---
+
+## Injection Prevention
+
+| Class | Defense |
+|-------|---------|
+| SQL | Parameterized queries / ORM bound parameters |
+| NoSQL | Driver-typed queries; reject operator-key user input |
+| OS command | Parameterized exec APIs; never shell with concatenated input |
+| LDAP / XPath | Library escaping; bind variables |
+| XSS | Context-aware output encoding; framework auto-escaping; CSP + Trusted Types |
+| HTML (WYSIWYG) | DOMPurify, ammonia, nh3, or equivalent allowlist sanitizer |
+| Template (SSTI) | Never interpolate user input into template source |
+| XML / XXE | Disable external entity and DTD processing |
+| Deserialization | Allowlist types; avoid native deserializers on untrusted input |
+| CSV | Prefix `= + - @ \t \r` with `'` per RFC 4180 guidance |
+| Log injection | Strip CR/LF from user input before logging |
+
+- Never compile or execute strings derived from user input (no dynamic code execution).
+
+---
+
+## XSS Defenses
+
+- Use a framework with automatic context-aware escaping (React, Vue, Angular, Svelte). Do not bypass escaping with raw HTML insertion APIs on untrusted data.
+- For untrusted HTML (markdown, WYSIWYG): sanitize with an allowlist library before rendering.
+- Deploy a strict CSP as defense in depth: nonces or hashes for inline scripts, no `unsafe-inline`, no `unsafe-eval`.
+- Enable Trusted Types (`require-trusted-types-for 'script'`) to block DOM-XSS sinks.
+- Set `X-Content-Type-Options: nosniff` so injected non-JS payloads aren't executed.
+
+---
+
+## Input Validation
+
+- Validate type, length, range, and format against an allowlist using a schema validator.
+- Validate server-side; client-side checks are UX only.
+- Canonicalize input (Unicode normalize, decode once) before validation.
+- File uploads: enforce max size, allowlist of MIME types verified by magic-byte inspection (not extension), store outside the web root or with non-executing storage backend, re-encode images.
+
+---
 
 ## JWT Security
 
-### Token Validation
-- ALWAYS validate the `alg` header and reject `none` and unexpected algorithms
-- Verify signature using the correct key for the algorithm (RSA public key for RS256, shared secret for HS256)
-- Validate all registered claims: `exp` (expiry), `iss` (issuer), `aud` (audience), `nbf` (not before)
-- Reject tokens with missing required claims
+- Whitelist accepted algorithms server-side; reject anything not on the list (including `none`, `NonE`, etc.).
+- Verify the signature with the algorithm the server selected, not the algorithm from the JWT header. Mitigates RS256 → HS256 confusion attacks.
+- Validate `exp`, `nbf`, `iss`, `aud`; reject if any required claim is missing.
+- Keep access tokens short-lived (5–15 min). Use rotating refresh tokens with reuse detection (7–30 days).
+- Store refresh tokens in `HttpOnly`, `Secure`, `SameSite` cookies. Never put any JWT in browser local or session storage.
+- Maintain a revocation list (or rely on short expiry + refresh rotation) for logout, password change, suspicious activity.
+- JWT payload is base64, not encrypted — do not put PII or secrets in it.
+- Use asymmetric algorithms (RS256, ES256, EdDSA) when issuer and verifier are different services.
 
-### Token Storage & Lifecycle
-- Store access tokens in memory, not in localStorage (vulnerable to XSS)
-- Use short-lived access tokens (5-15 minutes)
-- Use refresh tokens stored in httpOnly secure cookies with rotation
-- Revoke refresh tokens on logout, password change, and suspicious activity
-- Maintain a server-side deny list for revoked tokens (or use short expiry + refresh rotation)
+---
 
-### Common Pitfalls
-- Do not use symmetric signing (HS256) with a weak or guessable secret
-- Do not embed sensitive data (passwords, PII) in JWT payload as it is base64-encoded, not encrypted
-- Do not accept JWTs from untrusted sources without signature verification
-- Be aware of algorithm confusion attacks (RS256 vs HS256) and always enforce expected algorithm
+## SSRF Prevention (OWASP Top 10:2025 A01 sub-category)
 
-## SSRF Prevention
+- Allowlist destination hosts; if not feasible, denylist private/link-local ranges: `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `::1`, `fc00::/7`, `fe80::/10`.
+- Resolve the hostname, validate the resulting IPs against the allowlist, then connect to the resolved IP directly with `Host` header set — eliminates the second resolution that enables DNS rebinding.
+- Disable HTTP redirects, or re-validate the target after every redirect.
+- On AWS, enforce IMDSv2 (session-token PUT requests, hop limit 1); disable IMDSv1.
+- Run egress through a proxy that enforces the allowlist at the network layer.
+- Isolate services that make external requests in segmented network zones.
 
-### Request Validation
-- Validate and allowlist destination URLs/hostnames before making server-side HTTP requests
-- Block requests to private/internal IP ranges: `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `::1`, `fc00::/7`
-- Resolve DNS before checking IP ranges to prevent DNS rebinding attacks
-- Disable HTTP redirects in server-side requests, or re-validate the target after each redirect
-
-### Architecture
-- Use an egress proxy for all outbound HTTP requests from the server
-- Implement network-level controls (firewall rules) to restrict server-to-server communication
-- Run services that make external requests in isolated network segments
+---
 
 ## HTTP Security Headers
 
-ALWAYS set these security headers (via middleware, web server config, or framework):
+| Header | Value | Purpose |
+|--------|-------|---------|
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` | Force HTTPS |
+| `Content-Security-Policy` | nonce-based, no `unsafe-inline`/`unsafe-eval`, `frame-ancestors 'none'`, `require-trusted-types-for 'script'` | XSS / clickjacking defense |
+| `X-Content-Type-Options` | `nosniff` | Block MIME sniffing |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Limit referrer leakage |
+| `Permissions-Policy` | Deny unused features (`geolocation=()`, `camera=()`, ...) | Restrict browser APIs |
+| `Cross-Origin-Opener-Policy` | `same-origin` | Isolate window from cross-origin |
+| `Cross-Origin-Resource-Policy` | `same-origin` | Block cross-origin embedding |
+| `Cross-Origin-Embedder-Policy` | `require-corp` | Enable cross-origin isolation |
+| `Cache-Control` | `no-store` for authenticated responses | Prevent sensitive caching |
 
-### Essential Headers
-- **X-Frame-Options: DENY** - Prevent clickjacking (or use CSP frame-ancestors)
-- **X-Content-Type-Options: nosniff** - Prevent MIME type sniffing
-- **Strict-Transport-Security: max-age=31536000; includeSubDomains; preload** - Enforce HTTPS
-- **Referrer-Policy: strict-origin-when-cross-origin** - Control referrer information
-- **X-XSS-Protection: 0** - Disable legacy XSS filter (can introduce vulnerabilities in older browsers)
+- `X-Frame-Options` is obsoleted by CSP `frame-ancestors`; set both only for legacy browser support.
+- `X-XSS-Protection: 0` (the legacy filter creates more problems than it solves).
+- Roll out CSP in `Content-Security-Policy-Report-Only` first, observe violations, then enforce.
 
-### Content Security Policy (CSP)
-- **Content-Security-Policy** - Restrict resource loading to prevent XSS:
-  ```
-  default-src 'self';
-  script-src 'self' https://trusted-cdn.com;
-  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-  img-src 'self' data: https:;
-  font-src 'self' https://fonts.gstatic.com;
-  frame-ancestors 'none';
-  ```
-- Start restrictive, gradually allow trusted sources
-- Use 'nonce-' or 'hash-' instead of 'unsafe-inline' when possible
-- Test thoroughly - CSP can break functionality if misconfigured
+---
 
-### Additional Headers
-- **Permissions-Policy: geolocation=(), microphone=(), camera=()** - Restrict browser features
-- **Cross-Origin-Resource-Policy: same-origin** - Protect against Spectre attacks
+## CORS
 
-### Implementation
-- **Apache (.htaccess)**: Use `<IfModule mod_headers.c>` and `Header always set`
-- **Nginx**: Use `add_header` in server block
-- **Express.js**: Use helmet middleware
-- **Next.js**: Configure in next.config.js headers
-- **PHP**: Use header() function (less preferred than web server config)
+- Explicit allowlist of origins; never `Access-Control-Allow-Origin: *` on credentialed endpoints.
+- Reflect a request's origin only after matching it against the allowlist.
+- Set `Access-Control-Allow-Credentials: true` only when cookies/auth are actually required.
+- Limit `Access-Control-Allow-Methods` and `Access-Control-Allow-Headers` to what the API uses.
+- Validate the `Origin` header server-side for sensitive requests as additional defense.
 
-## CORS Configuration
+---
 
-- NEVER use '*' wildcard in production
-- Explicitly whitelist allowed origins:
-  - Express.js: Configure cors middleware with origin array
-  - PHP: Check $_SERVER['HTTP_ORIGIN'] and set Access-Control-Allow-Origin
-  - Next.js: Configure in next.config.js or API middleware
-- Set appropriate Access-Control-Allow-Methods (only methods you support)
-- Set Access-Control-Allow-Credentials: true only when needed
-- Be restrictive with Access-Control-Allow-Headers
+## Transport Security
 
-## HTTPS & Transport Security
+- TLS 1.2 minimum, TLS 1.3 strongly preferred (PCI DSS v4.0 baseline).
+- Disable SSLv2, SSLv3, TLS 1.0, TLS 1.1.
+- Use modern cipher suites (AEAD only: AES-GCM, ChaCha20-Poly1305).
+- Enable HSTS with `includeSubDomains`; submit to the HSTS preload list for high-value domains.
+- Use OCSP stapling or short-lived certificates; automate renewal (ACME / Let's Encrypt / cloud CA).
 
-- ALWAYS enforce HTTPS in production (NEVER allow HTTP for authenticated/sensitive operations)
-- Redirect HTTP to HTTPS:
-  - Apache: RewriteEngine with HTTPS check
-  - Nginx: return 301 for HTTP requests
-  - Express.js: Use express-sslify or custom middleware
-  - Next.js: Handle at reverse proxy level (recommended)
-- Enable HSTS header (max-age=31536000; includeSubDomains; preload)
-- Consider HSTS preload list submission for high-security sites
-- Use TLS 1.2 minimum (disable TLS 1.0/1.1)
+---
 
-## Cryptography (ASVS V11)
+## Cryptography (OWASP Top 10:2025 A04)
 
-### Documentation & Planning
-- Maintain documented policies for cryptographic key management (follow NIST SP 800-57)
-- Perform regular cryptographic discovery to identify all encryption, hashing, and signing operations
-- Document which keys protect which data types
-- Create migration plan for post-quantum cryptography (PQC) readiness
+- Use only vetted libraries (libsodium, platform crypto module). Never roll custom algorithms or modes.
+- Minimum strengths:
+  - Symmetric: AES-128 (AES-256 preferred), or ChaCha20-Poly1305
+  - Asymmetric: RSA >=3072 bits, ECC >=256 bits (P-256, Curve25519, Ed25519)
+  - Hash: SHA-256 / SHA-384 / SHA-512 / SHA-3
+- Use AEAD for encryption (AES-GCM, AES-GCM-SIV, ChaCha20-Poly1305). Never ECB. Never reuse a (key, nonce) pair.
+- Generate IVs/nonces with a CSPRNG.
+- Key derivation for passwords: Argon2id > scrypt > bcrypt > PBKDF2.
+- Key derivation for non-password secrets: HKDF.
+- Banned: MD5, SHA-1, DES, 3DES, RC4, PKCS#1 v1.5 padding for new code.
+- Never store keys in source code or unencrypted on disk.
+- Design for crypto agility — algorithm and key material replaceable without redesign.
 
-### Secure Implementation
-- Use only industry-validated cryptographic libraries and implementations:
-  - Node.js: crypto (built-in), sodium/libsodium, bcrypt/argon2
-  - PHP: openssl extension, sodium extension, password_hash()
-  - Python: cryptography library, PyCryptodome
-  - NEVER implement custom cryptographic algorithms
-- Design systems with "crypto agility" (ability to swap algorithms and update keys without major redesign)
-- Enforce minimum 128 bits of security across all algorithms:
-  - Symmetric: AES-128 minimum (AES-256 recommended)
-  - Asymmetric: 256-bit ECC or 3072-bit RSA minimum
-  - Hashing: SHA-256 minimum
-
-### Encryption Standards
-- Use authenticated encryption modes (AES-GCM recommended)
-- NEVER use weak modes like ECB
-- Avoid outdated padding schemes (PKCS#1 v1.5)
-- Use encrypt-then-MAC pattern when authenticated encryption not available
-- NEVER reuse nonces or initialization vectors (IVs) for the same key
-- Generate IVs using cryptographically secure random generation
-
-### Hashing & Key Derivation
-- Use only approved hash functions (SHA-256, SHA-384, SHA-512, SHA-3)
-- NEVER use MD5, SHA-1, or other compromised algorithms
-- Use computationally intensive key derivation functions for password storage:
-  - bcrypt (minimum cost factor 12)
-  - scrypt
-  - Argon2id (recommended)
-- Use 256-bit minimum output for collision-resistant hashing
-- Use 128-bit minimum for second preimage resistance
-
-### Random Number Generation
-- Generate all security-sensitive values using cryptographically secure PRNGs:
-  - Node.js: crypto.randomBytes()
-  - PHP: random_bytes()
-  - Python: secrets module
-- Ensure ≥128 bits of entropy for all security tokens
-- NEVER use Math.random(), rand(), or similar non-cryptographic generators
-- Avoid UUIDs for cryptographic purposes
-
-### Data Protection
-- Implement full memory encryption for highly sensitive data during processing
-- Minimize time sensitive data is exposed in memory
-- Encrypt sensitive data immediately after processing
-- Use constant-time operations to prevent timing-based information leaks
-
-### Key Management
-- Rotate cryptographic keys on a regular schedule
-- Store keys securely using key management systems (KMS) or hardware security modules (HSM)
-- NEVER hardcode cryptographic keys in source code
-- Separate key management from application logic
+---
 
 ## File Access Control
 
-- Restrict access to sensitive files via web server configuration:
-  - Apache: Use `<Files>` directive to deny access to config.php, .env, .htpasswd
-  - Nginx: Use location blocks with deny all
-  - Node.js: Ensure sensitive files are outside webroot
-- Disable directory listings:
-  - Apache: Options -Indexes
-  - Nginx: autoindex off
-- Place configuration files outside public webroot when possible
-- Never commit sensitive files to version control (.gitignore them)
+- Place config, credential, and key files outside the web root.
+- Block direct access to dotfiles and known sensitive paths (`.env`, `.git`, `.htpasswd`, `config.*`, backup extensions).
+- Disable directory listings.
+- Serve uploaded files from a separate origin/CDN with a non-executing content-type; never let them inherit application execution context.
+
+---
 
 ## Rate Limiting
 
-Implement rate limiting for all user-facing endpoints:
+- Token-bucket or sliding-window counter, backed by a centralized store (Redis) with atomic operations (Lua scripts) for distributed systems.
+- Use Redis server time, not application clocks, to avoid skew.
+- Recommended baselines:
+  - Login: 5 / 15 min per (IP + account)
+  - Password reset: 3 / 15 min per account
+  - Registration: 5 / hour per IP
+  - Authenticated API: 100 req/min per principal (tune to workload)
+  - Public/unauthenticated API: 20 req/min per IP
+- Return HTTP `429` with `Retry-After`; expose `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`.
+- Layer with WAF / bot detection / device fingerprinting for credential stuffing defense.
 
-### Critical Endpoints (Strict limits)
-- Login: 5 attempts per 15 minutes per IP
-- Password reset: 3 attempts per 15 minutes per IP
-- Registration: 5 attempts per hour per IP
-- Contact forms: 3 submissions per 15 minutes per IP
+---
 
-### API Endpoints (Moderate limits)
-- Authenticated APIs: 100 requests per minute per user
-- Public APIs: 20 requests per minute per IP
+## Logging & Error Handling (OWASP Top 10:2025 A10 — Mishandling of Exceptional Conditions)
 
-### Implementation
-- Use Redis for distributed rate limiting (production)
-- Use in-memory stores for single-server setups (development)
-- File-based rate limiting:
-  - Use file locking (flock()) to prevent race conditions
-  - Implement automatic cleanup of old entries
-  - Store in temp directory with restrictive permissions (0700)
-- Libraries:
-  - Express.js: express-rate-limit, rate-limiter-flexible
-  - PHP: Custom implementation with file/Redis backend
-- Return 429 Too Many Requests with Retry-After header
+- Log security events with: UTC timestamp, level, request ID, principal (or `anon`), source IP, user agent, action, outcome, resource.
+- Required events: auth success/failure, MFA challenges, authorization denials, password/email/MFA changes, privilege changes, rate-limit hits, CSRF failures, validation failures (sanitized), configuration changes, system errors.
+- Structured (JSON) logs; ship to a separate, append-only / tamper-evident store.
+- Never log: passwords, password hashes, full tokens (mask: `sk_...abc`), session IDs, full PAN, CVV, government IDs, raw request bodies for sensitive endpoints.
+- Sanitize CR/LF from user input before logging.
+- Return generic user-facing errors ("Invalid credentials", "An error occurred", "Access denied"). Never leak stack traces, SQL fragments, internal paths, or framework versions.
+- Fail closed: on validation error, auth check failure, or dependency outage, deny the action — never default-allow.
+- Implement a global last-resort handler so no unhandled exception ever reaches the response body.
 
-## Error Handling & Logging (ASVS V16)
+---
 
-### Logging Infrastructure & Documentation
-- Maintain an inventory documenting logging at each application layer:
-  - Events logged
-  - Log formats (prefer structured/JSON logs)
-  - Storage locations
-  - Access controls
-  - Retention periods
-- Synchronize time sources with UTC timestamps or explicit offsets across distributed systems
-- Transmit logs to isolated systems separate from production environments
-- Protect logs from unauthorized modification with integrity controls
+## Supply Chain Security (OWASP Top 10:2025 A03 — new)
 
-### Security Event Logging
-Log all security-relevant events with sufficient metadata for investigation:
-- **Authentication events**:
-  - Successful and failed login attempts (with IP, timestamp, username)
-  - MFA validation attempts
-  - Password reset requests
-- **Authorization events**:
-  - Failed authorization decisions
-  - Privilege escalation attempts
-  - Control bypass attempts
-- **Security violations**:
-  - Rate limit violations
-  - CSRF token validation failures
-  - Input validation failures (with sanitized input)
-  - Suspicious patterns (credential stuffing, brute force)
-- **System errors**:
-  - Unexpected errors and exceptions
-  - Backend failures (TLS errors, service unavailability)
-  - Configuration changes
+- Pin dependency versions; commit the lockfile (`package-lock.json`, `bun.lock`, `composer.lock`, `Cargo.lock`, etc.).
+- Defend against dependency confusion: scope private packages (`@org/*`), explicitly configure registry per scope.
+- Defend against typosquatting: before adding a new dependency, check publish date, maintainer history, and download count — treat brand-new or low-trust packages with suspicion.
+- Remove unused dependencies whenever changes leave them orphaned.
 
-### Log Entry Structure
-Each log entry should include:
-- Timestamp (UTC or with explicit offset)
-- Event type/severity (debug, info, warn, error)
-- User identifier (if authenticated)
-- IP address and user agent
-- Request ID for tracing
-- Action performed or attempted
-- Outcome (success/failure)
-- Relevant context (resource accessed, error codes)
+---
 
-### Sensitive Data in Logs
-- NEVER log passwords, password hashes, or password hints
-- NEVER log API keys, tokens, or session IDs in plain text
-- NEVER log credit card numbers, CVVs, or PINs
-- NEVER log personal identification numbers (SSN, passport numbers)
-- Allow logging of hashed or masked session tokens for debugging (with caution)
-- Sanitize user input before logging to prevent log injection attacks
-- Treat logs as sensitive assets requiring protection equivalent to the data they reference
+## Environment & Configuration
 
-### Error Handling Requirements
-- NEVER expose stack traces, internal paths, database structure, or technology details to users
-- Return generic error messages to users:
-  - "Invalid credentials" (NOT "Password incorrect" or "Username not found")
-  - "An error occurred" (NOT specific database errors)
-  - "Access denied" (NOT role/permission details)
-  - "Service temporarily unavailable" (for backend failures)
-- Implement safe failure modes:
-  - Use circuit breakers or degradation patterns when external resources fail
-  - Prevent fail-open conditions (never continue processing if validation fails)
-  - Fail securely (default to deny, not allow)
-- Use try-catch blocks to handle errors gracefully
-- Implement centralized error handling middleware
-- Implement last-resort exception handlers to catch unhandled exceptions (Level 3)
-
-## Environment Management
-
-- NEVER use production credentials in development/staging
-- ALWAYS use different API keys per environment
-- ALWAYS use different database instances per environment
-- Keep `.env.example` updated with all required variables (use placeholder values)
-- Document what each environment variable does
-- Use `.env.local` for local development secrets (git ignored)
-- Validate required environment variables at application startup (fail fast if missing)
-- Use different CSRF token secrets per environment
-
-## Dependency Management & Maintenance
-
-### Regular Updates
-- Run dependency updates regularly:
-  - Node.js: `bun update`
-  - PHP: `composer update`
-  - React: Update via bun
-- Check for security vulnerabilities:
-  - Node.js: `bun audit`
-  - PHP: `composer audit`
-
-### Dependency Security
-- Review dependencies before adding (check download count, last update, known issues)
-- Minimize dependency count (fewer dependencies = smaller attack surface)
-- Use official, well-maintained packages from trusted sources
-
-### Code Review
-- Review code for security issues before merging to main
-- Test authentication flows with invalid credentials and expired sessions
-- Test authorization by attempting to access resources without permission
-- Test rate limiting by exceeding limits
-- Test CSRF protection by submitting requests without token
-- Test input validation with malicious inputs (XSS, SQL injection attempts)
-
-## Security Testing Checklist (ASVS-Based)
-
-Before deploying to production, verify:
-
-### Data Protection (V14)
-- [ ] Sensitive data classified and documented
-- [ ] Sensitive data never sent in URLs/query strings
-- [ ] Data retention policies implemented
-- [ ] Cache-Control: no-store set for sensitive data responses
-- [ ] Clear-Site-Data header implemented for logout
-- [ ] Sensitive metadata removed from uploaded files
-
-### Input Validation & Injection Prevention (V1)
-- [ ] Input validation on all user inputs (type, length, format)
-- [ ] SQL injection prevention (parameterized queries)
-- [ ] XSS prevention (context-appropriate output encoding)
-- [ ] WYSIWYG content sanitized (DOMPurify or equivalent)
-- [ ] Command injection prevention (parameterized commands)
-- [ ] XML parser configured to prevent XXE
-- [ ] CSV exports sanitized (no formula injection)
-- [ ] Deserialization uses allowlists
-
-### Authentication (V6)
-- [ ] Password policy enforced (minimum 8 chars, no complexity requirements)
-- [ ] Passwords validated against top 3,000 common passwords
-- [ ] Password paste functionality enabled
-- [ ] MFA implemented for sensitive applications
-- [ ] Credential stuffing protection (rate limiting + detection)
-- [ ] User enumeration prevented (consistent errors and timing)
-- [ ] Password reset secure (doesn't bypass MFA)
-- [ ] No password hints or security questions
-- [ ] Cryptographically secure token generation
-
-### Session Management (V7)
-- [ ] Session documentation complete (timeouts, policies)
-- [ ] Session tokens have ≥128 bits of entropy
-- [ ] New tokens issued on authentication
-- [ ] Inactivity timeout implemented
-- [ ] Absolute maximum session lifetime implemented
-- [ ] Logout completely terminates sessions
-- [ ] Users can view and terminate active sessions
-- [ ] Session security flags set (httpOnly, secure, sameSite)
-- [ ] Re-authentication required for sensitive changes
-
-### CSRF Protection
-- [ ] CSRF protection on all state-changing requests
-- [ ] CSRF tokens cryptographically secure (≥128 bits)
-- [ ] Tokens validated server-side
-- [ ] Tokens rotated after validation
-
-### Cryptography (V11)
-- [ ] Cryptographic inventory documented
-- [ ] Industry-validated libraries used (no custom crypto)
-- [ ] Minimum 128-bit security level enforced
-- [ ] Authenticated encryption used (AES-GCM)
-- [ ] No weak cipher modes (ECB) or algorithms (MD5, SHA-1)
-- [ ] Password hashing uses bcrypt/scrypt/Argon2
-- [ ] Cryptographically secure PRNG for all security tokens
-- [ ] Keys stored securely (not hardcoded)
-- [ ] Key rotation schedule documented
-
-### HTTP Security
-- [ ] HTTPS enforced (HTTP redirects to HTTPS)
-- [ ] TLS 1.2 minimum (TLS 1.0/1.1 disabled)
-- [ ] HSTS header set (max-age=31536000)
-- [ ] Security headers configured (securityheaders.com score A+):
-  - X-Frame-Options or CSP frame-ancestors
-  - X-Content-Type-Options: nosniff
-  - Referrer-Policy
-  - Content-Security-Policy
-  - Permissions-Policy
-- [ ] CORS configured (no wildcard in production)
-
-### Error Handling & Logging (V16)
-- [ ] Logging inventory documented
-- [ ] Error messages generic (no information disclosure)
-- [ ] No stack traces exposed to users
-- [ ] Security events logged (auth, authz, violations)
-- [ ] Structured logging with UTC timestamps
-- [ ] No sensitive data in logs (passwords, tokens, PII)
-- [ ] Log integrity controls implemented
-- [ ] Logs transmitted to isolated system
-- [ ] Safe failure modes (circuit breakers, fail secure)
-- [ ] Last-resort exception handlers implemented
-
-### File Security
-- [ ] File upload validation (MIME type, size, content)
-- [ ] Sensitive files protected (.env not accessible)
-- [ ] Directory listings disabled
-- [ ] Configuration files outside webroot
-
-### Rate Limiting
-- [ ] Rate limiting on authentication endpoints (5/15min)
-- [ ] Rate limiting on password reset (3/15min)
-- [ ] Rate limiting on registration (5/hour)
-- [ ] Rate limiting on contact forms (3/15min)
-- [ ] 429 responses with Retry-After header
-
-### Environment & Dependencies
-- [ ] Environment variables properly configured
-- [ ] .env and sensitive files in .gitignore
-- [ ] Required env vars validated at startup
-- [ ] Different credentials per environment
-- [ ] Dependencies updated and vulnerability-free (audit passed)
-- [ ] Dependency review completed
+- Distinct credentials, API keys, database instances, and signing keys per environment.
+- Validate required env vars at startup; fail fast if missing.
+- Maintain `.env.example` with every required variable using placeholder values.
+- Never use production data in non-production environments without irreversibly anonymizing it.
+- Disable debug endpoints, stack traces, and verbose error pages in production.

@@ -1,10 +1,5 @@
 # CLAUDE.md
 
-## Project Initialization
-@.claude/project-init.md
-
----
-
 ## Verification Standards
 
 **IMPORTANT: NEVER claim something is working, running, or accessible unless you have actually verified it**
@@ -69,9 +64,6 @@ For comprehensive guidelines on specific topics, see:
 ### Security
 @.claude/security.md
 
-### Security Review Process
-@.claude/security-review.md
-
 ### Testing
 @.claude/testing.md
 
@@ -90,12 +82,14 @@ For comprehensive guidelines on specific topics, see:
 ### Code Quality & Standards
 @.claude/standards.md
 
+### Naming Conventions
+@.claude/naming.md
+
 ---
 
 ## Critical Rules Summary
 
 ### Always
-- When asked to init or create a project CLAUDE.md, follow @.claude/project-init.md
 - Create GitHub issues for features and bugs
 - Search the project for existing examples and patterns before writing code (templates, pages, components, functions)
 - Write tests for new features

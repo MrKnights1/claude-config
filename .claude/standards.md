@@ -1,426 +1,199 @@
 # Code Quality & Standards
 
-## Code Quality Standards
-
-- Write self-documenting code with clear, descriptive variable and function names
-- Prefer meaningful names over comments: `calculateUserTotalPurchases()` not `calc()`
-- Keep functions small and focused on a single responsibility
-- Add comments only when code intent isn't obvious from names alone
-- Maximum function length: ~50 lines (break up larger functions)
-- Maximum file length: ~300-400 lines (split into modules)
-- Maximum nesting depth: 2-3 levels (use early returns)
-- Maximum function parameters: 3-4 (use objects for more)
-- Use named constants instead of magic numbers/strings
-- Extract complex conditions into named variables or functions
-- Separate concerns: data access, business logic, presentation
-- Pass dependencies explicitly instead of using global state
-- Keep pure functions free of side effects
-- Avoid circular dependencies between modules
-- No god classes/functions (if it does too many things, split it)
-- Prefer composition over inheritance
-- Single source of truth for state (don't duplicate data)
-- Avoid callback hell (use async/await, Promises)
-- Don't mix abstraction levels in same function (high-level logic shouldn't contain low-level details)
-
-## Pull Request Guidelines
-
-### PR Size
-- Keep PRs small and focused (< 400 lines changed ideal)
-- One feature or fix per PR
-- Split large changes into sequential PRs
-
-### PR Title Format
-```
-[Type]: Brief description
-
-Examples:
-feat: Add user authentication flow
-fix: Resolve login timeout issue
-refactor: Extract payment processing to service
-docs: Update API documentation
-```
-
-### PR Description Template
-```markdown
-## Summary
-Brief description of changes and why they were made.
-
-## Changes
-- Added user authentication middleware
-- Created login/logout endpoints
-- Added session management
-
-## Testing
-- [ ] Unit tests added/updated
-- [ ] Integration tests pass
-- [ ] Manual testing completed
-
-## Screenshots (if UI changes)
-[Add screenshots here]
-
-## Related Issues
-Closes #123
-```
-
-### PR Best Practices
-- Self-review before requesting reviews
-- Respond to feedback promptly
-- Keep discussions focused and constructive
-- Update PR based on feedback (don't just resolve comments)
-- Squash commits before merge (clean history)
+Universal rules for writing, reviewing, shipping, and maintaining code. For identifier naming, see `naming.md`.
 
 ---
 
-## Code Review Checklist
+## Code Quality
 
-### For Reviewers
+Adhere to KISS, DRY, and YAGNI: keep designs simple, eliminate duplication, and refuse to build for hypothetical futures.
 
-#### Functionality
-- [ ] Code does what the PR description says
-- [ ] Edge cases are handled
-- [ ] Error handling is appropriate
-- [ ] No obvious bugs or logic errors
-
-#### Code Quality
-- [ ] Code is readable and self-documenting
-- [ ] Functions are small and focused
-- [ ] No code duplication (DRY)
-- [ ] Naming is clear and consistent
-
-#### Security
-- [ ] No hardcoded secrets or credentials
-- [ ] User input is validated and sanitized
-- [ ] SQL queries are parameterized
-- [ ] Authentication/authorization is correct
-
-#### Testing
-- [ ] Tests cover the changes
-- [ ] Tests are meaningful (not just for coverage)
-- [ ] Edge cases are tested
-
-#### Performance
-- [ ] No obvious performance issues
-- [ ] No N+1 queries
-- [ ] Large datasets are paginated
-
-#### Documentation
-- [ ] Complex logic is commented
-- [ ] Public APIs are documented
-- [ ] README updated if needed
-
-### Review Etiquette
-- Be constructive, not critical
-- Explain the "why" behind suggestions
-- Distinguish between blocking issues and suggestions
-- Use prefixes: `nit:`, `suggestion:`, `question:`, `blocking:`
-- Approve with minor comments when appropriate
-
----
-
-## Git Branch Conventions
-
-### Branch Naming
-```
-{issue-number}-{short-description}
-
-Examples:
-123-add-user-authentication
-456-fix-login-timeout
-789-refactor-payment-service
-```
-
-### Branch Lifecycle
-1. Create from `main`
-2. Work on changes, commit frequently
-3. Push to remote, create PR
-4. Address review feedback
-5. Squash merge to main
+- **Single responsibility.** Each function, class, or module has one reason to change. If its description needs the word "and", split it.
+- **Function length.** Aim for 15–20 lines; treat 50 as the hard ceiling. Longer functions are usually doing too much.
+- **File length.** Split files past ~300–400 lines into focused modules.
+- **Nesting depth.** Cap at 2–3 levels. Use early returns instead of deep `if/else` pyramids.
+- **Parameters.** Cap at 3–4. Group related arguments into an object.
+- **Magic values.** Replace inline numbers and strings with named constants.
+- **Extract conditions.** Pull complex boolean expressions into a named helper or variable.
+- **Separate concerns.** Data access, business logic, and presentation live in different layers.
+- **Explicit dependencies.** Pass collaborators in; avoid global mutable state.
+- **Single source of truth.** Each piece of state lives in one place; everything else derives from it.
+- **Composition over inheritance.** Prefer assembling behavior from small parts over deep class hierarchies.
+- **No circular dependencies.** Modules that import each other belong in one module or need a third to break the cycle.
+- **One abstraction level per function.** High-level orchestration code must not mix in low-level details.
+- **Self-documenting code.** Names carry the intent (see `naming.md`). Add comments only when the *why* cannot be expressed in code.
 
 ---
 
 ## Definition of Done
 
-A task is complete when:
+A change is done when every item below is true. Anything skipped is reported, not silently dropped.
 
-- [ ] Code is written and works as expected
-- [ ] Unit tests pass
-- [ ] Integration tests pass (if applicable)
-- [ ] Code review approved
-- [ ] Documentation updated (if needed)
-- [ ] No linting or type errors
-- [ ] Merged to main branch
-- [ ] Verified in staging/production
+- [ ] Behavior matches the requirement and edge cases are handled.
+- [ ] Tests for the new behavior and at least one meaningful failure mode are added and passing.
+- [ ] Full relevant test suite passes locally.
+- [ ] Lint and type checks pass with zero new warnings.
+- [ ] Docs, `.env.example`, and migration files updated where the change affects them.
+- [ ] Verified working by exercising the actual code path (CLI run, UI flow, API call) — not just by passing tests.
 
 ---
 
-## Technical Debt Management
+## Technical Debt
 
-### Identifying Tech Debt
-- Code that works but needs improvement
-- Shortcuts taken for deadlines
-- Outdated patterns or libraries
-- Missing tests or documentation
-
-### Tracking Tech Debt
-```markdown
-// TODO(#issue-number): Description of what needs to be done
-// Example:
-// TODO(#234): Refactor this to use the new auth service
-```
-
-### Addressing Tech Debt
-- Create issues for significant debt
-- Allocate time each sprint for debt reduction
-- Prioritize debt that blocks features
-- Don't let debt accumulate indefinitely
-
----
-
-## Performance Guidelines
-
-### General Rules
-- Measure before optimizing (use profiling tools)
-- Optimize hot paths, not everything
-- Cache expensive operations
-- Lazy load when possible
-
-### Frontend Performance
-- Bundle size: < 200KB initial JS (gzipped)
-- First Contentful Paint: < 1.5s
-- Time to Interactive: < 3.5s
-- Use code splitting for routes
-- Optimize images (WebP, lazy loading)
-
-### Backend Performance
-- API response time: < 200ms (p95)
-- Database queries: < 100ms
-- Use connection pooling
-- Implement caching (Redis, memory)
-- Paginate large datasets
-
-### Database Performance
-- Add indexes for frequent queries
-- Avoid N+1 queries
-- Use EXPLAIN to analyze queries
-- Monitor slow query logs
-
----
-
-# Accessibility
-
-- ALWAYS make interactive elements keyboard accessible (Tab, Enter, Space, Arrow keys)
-- ALWAYS use proper semantic HTML tags (`<button>`, `<nav>`, `<main>`, `<article>`)
-- ALWAYS add ARIA labels for screen readers where semantic HTML insufficient
-- ALWAYS ensure color contrast meets WCAG AA standards (4.5:1 for normal text, 3:1 for large text)
-- NEVER rely solely on color to convey information
-- ALWAYS provide text alternatives for images (alt text)
-- ALWAYS ensure forms are accessible (labels, error messages, focus states)
-
-### Accessibility Checklist
-- [ ] All interactive elements are keyboard accessible
-- [ ] Focus states are visible
-- [ ] Images have alt text
-- [ ] Form fields have labels
-- [ ] Color contrast passes WCAG AA
-- [ ] Page structure uses semantic HTML
-- [ ] Error messages are announced to screen readers
-
----
-
-# Documentation Requirements
-
-- Update README.md when adding new features or changing setup
-- Document all environment variables in `.env.example`
-- Keep API documentation up to date with actual implementation
-- Include setup instructions for new developers
-- Document architectural decisions (ADRs for significant changes)
-
-### README Structure
-```markdown
-# Project Name
-
-Brief description of the project.
-
-## Getting Started
-
-### Prerequisites
-- Node.js >= 18
-- PostgreSQL >= 14
-
-### Installation
-bun install
-
-### Environment Setup
-cp .env.example .env
-# Edit .env with your values
-
-### Running Locally
-bun run dev
-
-## Available Scripts
-- bun run dev - Start development server
-- bun run build - Build for production
-- bun test - Run tests
-- bun run lint - Check code style
-
-## Project Structure
-Brief overview of directory structure.
+When introducing or encountering deferred work, mark it inline with a tracked issue reference:
 
 ```
+TODO(#issue-number): what needs to change and why
+```
+
+### Sources of debt to recognize
+
+- Shortcuts taken under deadline pressure.
+- Code that works but is hard to change (high coupling, low cohesion, dead branches, ad-hoc patterns).
+- Outdated dependencies and deprecated APIs.
+- Recurring bug clusters in one area — usually a design smell, not a coding smell.
+- High cyclomatic complexity, duplication rate, or churn in a single file.
 
 ---
 
-# UI/UX Consistency
+## Performance
 
-- Use consistent spacing scale (4px, 8px, 16px, 24px, 32px)
-- Use design system/component library for consistency
-- Keep button styles and colors consistent
-- Use consistent loading states (spinners, skeletons)
-- Provide feedback for all user actions (success, error, loading)
-- Keep forms consistent (labels, validation, error display)
+Apply known performance patterns; avoid known anti-patterns. Numeric production targets (Core Web Vitals, p95 latency) require real users and telemetry — out of scope for code-time decisions.
 
-### Loading States
-- Use skeleton loaders for content areas
-- Use spinners for actions (buttons, forms)
-- Disable interactive elements while loading
-- Show progress for long operations
+### Patterns to apply
 
-### Error States
-- Display errors near the relevant field/action
-- Use consistent error styling (color, icon)
-- Provide clear recovery instructions
-- Log errors for debugging
+- **Pagination.** Every list endpoint paginates and caps maximum page size.
+- **Connection pooling.** Reuse connections across requests; never create one per request.
+- **Caching.** Cache results of expensive, repeatable computations at the appropriate layer.
+- **Code-splitting and lazy-loading.** Split per route. Defer below-the-fold work.
+- **Image optimization.** Modern formats (WebP/AVIF), responsive sizes, lazy loading.
+- **Indexing.** Index every foreign key and every column used in `WHERE`, `JOIN`, `ORDER BY`, `GROUP BY`.
 
----
+### Anti-patterns to avoid
 
-# Code Cleanup Guidelines
-
-After any code change or refactor:
-
-### Always Remove
-- [ ] Unused imports and dependencies
-- [ ] Commented-out code (use git history)
-- [ ] Unused variables, functions, and classes
-- [ ] Debug `console.log` statements
-- [ ] Temporary test code
-- [ ] Unused files (orphaned components)
-- [ ] Unused CSS classes and styles
-- [ ] Completed TODO comments
-- [ ] Dead code paths (unreachable code)
-
-### Always Update
-- [ ] Outdated comments
-- [ ] `.env.example` (add/remove variables)
-- [ ] Type definitions (if signatures changed)
-- [ ] Tests (if behavior changed)
-
-### Verification
-- Run linter to catch unused code
-- Check for unused dependencies (`depcheck`)
-- Review git diff before committing
-- Run full test suite
+- **N+1 queries.** Use eager loading, joins, or batch fetching — never a query inside a loop over results.
+- **Unbounded result sets.** No endpoint that can return arbitrarily many rows.
+- **`SELECT *` when only some columns are read.**
+- **Per-request expensive setup.** TLS handshake, DB connection, secret retrieval per request.
+- **Speculative optimization.** No memoization, parallelization, or abstraction added "for performance" without a measurement showing a real hot path.
 
 ---
 
-## Naming Conventions
+## Accessibility — WCAG 2.2 AA
 
-### Variables and Functions
-```typescript
-// camelCase for variables and functions
-const userName = 'John';
-function calculateTotal() {}
+Target WCAG 2.2 Level AA, the standard most regulations now reference.
 
-// PascalCase for classes and components
-class UserService {}
-function UserProfile() {}
+### Required
 
-// UPPER_SNAKE_CASE for constants
-const MAX_RETRY_COUNT = 3;
-const API_BASE_URL = 'https://api.example.com';
-
-// Prefix booleans with is/has/can/should
-const isActive = true;
-const hasPermission = false;
-const canEdit = true;
-```
-
-### File and Directory Names
-```
-# Components: PascalCase
-UserProfile.tsx
-LoginForm.vue
-
-# Utilities: camelCase
-formatDate.ts
-apiClient.ts
-
-# Constants: camelCase or UPPER_SNAKE
-config.ts
-API_ENDPOINTS.ts
-
-# Directories: lowercase with hyphens
-user-profile/
-api-client/
-```
+- **Semantic HTML first.** Use `<button>`, `<nav>`, `<main>`, `<form>`, `<label>` before reaching for ARIA. Native elements carry built-in keyboard and assistive-tech support.
+- **Keyboard access.** Every interactive element is reachable and operable via Tab, Shift+Tab, Enter, Space, and arrow keys where appropriate.
+- **Visible focus.** The focused element is always visually distinguishable and not occluded by sticky headers, modals, or overlays.
+- **Color contrast.** 4.5:1 for body text, 3:1 for large text and meaningful non-text UI (icons, focus rings, form borders).
+- **Color is never the only signal.** Pair color with text, icon, or pattern.
+- **Text alternatives.** Every meaningful image has `alt`; decorative images use `alt=""`.
+- **Forms.** Every input has a visible, persistent `<label>`. Errors are announced to assistive tech and shown near the field. Placeholder text never replaces a label.
+- **Target size.** Pointer targets are at least 24×24 CSS pixels (AA) — 44×44 is the AAA target and a safer default for touch.
+- **Dragging alternatives.** Any drag interaction has a single-pointer non-drag alternative.
+- **Accessible authentication.** Login flows do not require memorization-only puzzles; allow paste into password fields and offer alternatives to CAPTCHAs.
+- **Reduced motion.** Honor `prefers-reduced-motion` for animations and transitions.
 
 ---
 
-## Error Handling Standards
+## Documentation
 
-### Backend
-```typescript
-// Use custom error classes
-class AppError extends Error {
-  constructor(
-    public code: string,
-    public message: string,
-    public statusCode: number = 500
-  ) {
-    super(message);
-  }
-}
+Keep documentation close to the code it describes and updated in the same change that alters behavior.
 
-// Throw meaningful errors
-throw new AppError('NOT_FOUND', 'User not found', 404);
+### README
 
-// Centralized error handler
-app.use((err, req, res, next) => {
-  logger.error({ err, requestId: req.id });
-  res.status(err.statusCode || 500).json({
-    success: false,
-    error: {
-      code: err.code || 'INTERNAL_ERROR',
-      message: err.message || 'An error occurred'
-    }
-  });
-});
-```
+A newcomer should be able to clone the repo and run it in under 10 minutes.
 
-### Frontend
-```typescript
-// Use error boundaries for React
-class ErrorBoundary extends React.Component {
-  componentDidCatch(error, errorInfo) {
-    logError(error, errorInfo);
-  }
+Required sections:
 
-  render() {
-    if (this.state.hasError) {
-      return <ErrorFallback />;
-    }
-    return this.props.children;
-  }
-}
+1. **What it is** — one or two sentences.
+2. **Prerequisites** — language/runtime versions, system services.
+3. **Setup** — install, environment file copy, database migrate/seed.
+4. **Run** — dev server, tests, build, lint — one canonical command each.
 
-// Handle async errors consistently
-async function fetchData() {
-  try {
-    const data = await api.get('/users');
-    return data;
-  } catch (error) {
-    showErrorToast('Failed to load users');
-    logError(error);
-    throw error; // Re-throw for error boundaries
-  }
-}
-```
+### Other artifacts to keep in sync
+
+- `.env.example` mirrors every variable the app reads — placeholder values only, no secrets.
+- API reference (OpenAPI or equivalent) matches deployed behavior; generated from the source when possible.
+
+---
+
+## UI/UX Consistency
+
+- **Spacing scale.** Pick one (e.g. 4 / 8 / 16 / 24 / 32 px) and use it everywhere. Arbitrary one-off values fragment the design.
+- **Component library.** Reuse one set of primitives (buttons, inputs, modals) across the app.
+- **Feedback for every action.** Loading, success, and error states are explicit — never silent.
+- **Loading states.** Skeletons for content areas; spinners for in-progress actions; disable controls mid-submit; show progress for anything slow.
+- **Error states.** Display the error next to the field or action that caused it, with clear recovery instructions and consistent styling.
+- **Form patterns.** Labels, validation timing, and error display behave the same across every form.
+
+---
+
+## Error Handling
+
+### Fail fast on programmer errors
+
+Invariant violations, missing required config, contract breaches between modules — throw immediately and loudly. Continuing in an undefined state corrupts data and hides the root cause.
+
+### Degrade gracefully on operational errors
+
+Non-essential external dependency unavailable? Disable that feature, keep the rest of the app working. The fallback must be simpler and more reliable than what it replaces — usually a cache, a static value, or a default. Never fall back in a way that bypasses a security or correctness check.
+
+### Retries
+
+Retry only on transient failures (network timeouts, 5xx, rate limits). Use exponential backoff with jitter and a max attempt cap to avoid retry storms and thundering herds.
+
+### User-facing messages
+
+- Never expose stack traces, internal paths, database errors, or library names to end users.
+- Return a generic, actionable message ("We couldn't complete that — try again or contact support") with a correlation/request ID.
+- Log the full error with context server-side, including the same correlation ID.
+
+### Centralized handling
+
+Funnel errors through one handler per surface (HTTP middleware, top-level UI boundary, background-job wrapper). Per-call try/catch is for cases the surrounding code can actually recover from.
+
+---
+
+## Code Cleanup
+
+After every change — feature, fix, refactor — remove what is no longer needed and update what drifted.
+
+### Remove
+
+- Unused imports, variables, functions, classes, files.
+- Commented-out code (git history is the archive).
+- Debug print/log statements left from development.
+- Dead branches and unreachable code.
+- Unused CSS classes and assets.
+- Completed `TODO` markers.
+
+### Update
+
+- Outdated comments and docstrings.
+- `.env.example` when variables are added or removed.
+- Type signatures and downstream callers.
+- Tests when behavior intentionally changes.
+
+### Verify
+
+- Linter passes with zero new warnings.
+- Dependency check (e.g. `depcheck` or equivalent) shows no unused packages.
+- Full test suite passes.
+- Final review of `git diff` before committing.
+
+---
+
+## Error Class Pattern (language-neutral)
+
+Define one application error type that carries:
+
+- A stable machine-readable code (e.g. `NOT_FOUND`, `VALIDATION_ERROR`).
+- A short, safe-to-display message intended for end-user surfaces.
+- A status code or category for the transport layer to map.
+- Optional context (request ID, offending field).
+
+Throw it from business logic. Catch it in the centralized handler, log with full context, render the safe message to the caller.
