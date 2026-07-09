@@ -16,10 +16,11 @@ Squash merge completed feature branch to main with proper commit message.
 
 ## Rules
 
-- Include `Closes #XX` on separate line when an issue number was identified (merges are when issues actually close — intermediate commits omit this). If no issue is associated, omit it.
+- Include `Closes #XX` on separate line when an issue number was identified (merges are when issues actually close — intermediate branch commits omit this; a direct-to-`main` commit closes its own issue via the commit skill). If no issue is associated, omit it.
 - NEVER include "Co-Authored-By: Claude"
 - Use detailed commit body for complex changes
-- Do NOT push (user will push manually)
+- NEVER push — the user pushes manually, always.
+- NEVER auto-commit the merge — pass the confirmation gate in Process step 10 before committing to `main`.
 - NEVER skip or shortcut — when invoked, always execute the full process above
 
 ## Examples
@@ -60,7 +61,7 @@ Closes #80
 7. Squash merge using the literal branch name from step 1: `git merge --squash <branch-name>`
 8. **Conflict check**: run `git status`. If any unmerged paths exist, roll back with `git reset --merge` (do NOT use `git merge --abort` — `--squash` does not create MERGE_HEAD) and report the conflicts to the user. Do not commit a broken state.
 9. **Draft the commit message** using the Commit Format table above.
-10. Commit with the HEREDOC below. Substitute `Commit message here.` with the drafted message from step 9. If an issue number was found in step 2, include `Closes #<num>` on its own line after a blank line. If no issue, omit the `Closes` line entirely. The HEREDOC terminator `EOF` MUST be at column 0:
+10. **Confirmation gate**: show the user the drafted commit message and the staged diff summary (`git diff --cached --stat`), and wait for explicit approval before committing — never auto-commit the squash-merge onto `main`. Then commit with the HEREDOC below. Substitute `Commit message here.` with the drafted message from step 9. If an issue number was found in step 2, include `Closes #<num>` on its own line after a blank line. If no issue, omit the `Closes` line entirely. The HEREDOC terminator `EOF` MUST be at column 0:
 
 ```bash
 git commit -m "$(cat <<'EOF'
